@@ -42,11 +42,69 @@ class Neuron:
             pass
 
     def calculate(self, x):
+        '''
+        Changes the weights
+        Arguments:
+        ----------
+        x: (n, ) array-like
+            - Inputs to the neuron
+            - n must match the number of inputs
+
+        Returns:
+        --------
+        output: (n + 1, ) array-like
+            - Calculated output
+            - n + 1 for output size due to bias
+        '''
+        # Saves the input to the neuron
+        self.input = x
+
         # Formula: W*x + b (W is weights vector, b is bias)
-        return np.dot(self.w[0:self.n], x) + self.w[-1]
+        # Saves the output to the Neuron
+        self.output = np.dot(self.w[0:self.n], x) + self.w[-1]
+
+        return self.output # Returns the output
 
     def calcpartialderivative(self):
-        pass
+        '''
+        Changes the weights
+        Arguments:
+        ----------
+        No arguments, member method
+
+        Returns:
+        --------
+        No return, only updates internals of class
+        '''
+        # Intialize partial derivative array:
+        dE_dw = np.zeros(self.n + 1)
+        
+        # Delta = dE/dOo1 * dOo1/dneto1
+        delta = activationderivative(self.input) # * derivative?
+
+        # Iterate over weights:
+        for i in range(self.n):
+            dE_dw[i] = delta * self.input[i]
+
+        # Derivative for bias:
+        dE_dw[-1] = delta # It's just delta here
+
+        # Stores the vector of partial derivatives internally
+        self.dE_dw = dE_dw
+
+        return dE_dw
 
     def updateweights(self):
-        pass
+        '''
+        Changes the weights
+        Arguments:
+        ----------
+        No arguments, member method
+
+        Returns:
+        --------
+        No return, only updates internals of class
+        '''
+        # Iterate over the weights and update based on 
+        for i in range(self.n + 1):
+            self.w[i] = self.w[i] - self.alpha * self.dE_dw[i]
