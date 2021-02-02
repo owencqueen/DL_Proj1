@@ -95,7 +95,6 @@ class Neuron:
         return dE_dw
 
     def updateweights(self):
-<<<<<<< HEAD
         '''
         Changes the weights
         Arguments:
@@ -109,7 +108,6 @@ class Neuron:
         # Iterate over the weights and update based on 
         for i in range(self.n + 1):
             self.w[i] = self.w[i] - self.alpha * self.dE_dw[i]
-=======
         pass
 
 class FullyConnectedLayer:
@@ -146,4 +144,3 @@ class FullyConnectedLayer:
 class NeuralNetwork:
     def __init__(self, num_layers, num_neurons, num_inputs, lr=0.01, loss_func=None, \
         act_funcs=None):
->>>>>>> be826c1e5a8a69512496ffd4ac38b25aa84d901a
