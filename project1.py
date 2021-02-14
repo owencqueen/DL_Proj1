@@ -84,8 +84,6 @@ class Neuron:
         # Delta = dE/dOo1 * dOo1/dneto1
         dE_dO = sum(l1_deltas_x_w)
             # Summing all delta * w_i terms to account for partial of error
-        #print(self.output)
-        #print('XXXXXXXXXXXX')
         dO_dnet = self.activationderivative(self.output) 
             # Derviative of activation function, plugging in self.input
 
@@ -121,8 +119,6 @@ class Neuron:
         # Iterate over the weights and update based on 
         for i in range(self.n + 1):
             # self.n + 1 makes sure to include bias
-            #print(self.dE_dw[i])
-            #print(self.alpha)
             self.w[i] = self.w[i] - self.alpha * self.dE_dw[i]
 
 class FullyConnectedLayer:
@@ -225,7 +221,6 @@ class FullyConnectedLayer:
 
         # Iterate over all neurons:
         for i in range(0, self.n_n):
-            #print("neuron: ", i)
             # Calculate delta value for this specific neuron:
             delta_i = self.neurons[i].calcpartialderivative(delta_w_matrix[:,i])
             # Add delta to the matrix
@@ -240,16 +235,29 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         Initializes the Neural Network
         Arguments:
         ----------
-        numOfLayers:
-        numOfNeurons:
-        inputSize:
-        activation:
-        loss:
-        lr:
-        weights:
-        
+        numOfLayers: int
+            - number of hidden + output layers
+        numOfNeurons: int
+            - number of neurons in each layer
+        inputSize: int
+            - number of inputs
+        activation: string, optional
+            - Default: 'logistic'
+            - Options: 'logistic', 'linear'
+            - Specifies the activation function to be used by each neuron in layer
+        loss: string, optional
+            - Default: 'square'
+            - Options: 'square' (square loss), 'binary' (binary cross-entropy loss)
+            - loss function to use for network
+        lr: float, optional
+            - Default: 0.001
+            - learning rate for backpropagation
+        weights: numpy array, optional
+            - Default: None
+            - weights to load into network
         Returns
         -------
+        No return value
         '''      
 
         self.n_l = numOfLayers
@@ -257,7 +265,6 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         self.in_size = inputSize
 
         #set loss function
-        #NOT SURE ABOUT BINARY LOSS
         if loss == 'binary':
             self.loss = lambda y, y_hat: np.sum(-(y*np.log(y_hat) + (1-y)*np.log(1-y_hat)))/self.n_n
             self.loss_deriv = lambda y_hat, y: -(y/y_hat) + ((1-y)/(1-y_hat))
@@ -268,8 +275,16 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         #set up network
         self.network = []
 
+        #set up input layer
+        in_layer = []
+        if weights is None:
+            in_layer = FullyConnectedLayer(self.n_n, self,in_size, activation=activation, learning_rate=lr)
+        else:
+            in_layer = FullyConnectedLayer(self.n_n, self.in_size, activation=activation, learning_rate=lr, w_0=weights[0])
+        self.network.append(in_layer)
+
         tmp_layer = []
-        for i in range(0, self.n_l):
+        for i in range(1, self.n_l):
             if weights is None:
                 tmp_layer = FullyConnectedLayer(self.n_n, self,n_n, activation=activation, learning_rate=lr)
             else:
@@ -278,6 +293,18 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
     
     #Given an input, calculate the output (using the layers calculate() method)    
     def calculate(self,input):
+        '''
+        Forward pass of network
+        Arguments:
+        -----------
+        input: numpy array
+            - input to network
+
+        Returns:
+        --------
+        out: numpy array
+            - output from network's ouptut layer
+        '''
         #calculate first layer output based on input           
         out = self.network[0].calculate(input)
         # #number of hidden layers after first layer
@@ -286,17 +313,64 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
 
         return out
     #Given a predicted output and ground truth output simply return the loss (depending on the loss function)    
+<<<<<<< HEAD
     def calculateloss(self,yp,y):        
         return self.loss(yp, y)
         
     #Given a predicted output and ground truth output simply return the derivative of the loss (depending on the loss function)            
     def lossderiv(self,yp,y):        
         return self.loss_deriv(yp, y)
+=======
+    def calculateloss(self,yp,y):
+        '''
+        Calculates loss value
+        Arguments:
+        ----------
+        yp: numpy array
+            - prediction from network
+        y: numpy array
+            - ground truth
+
+        Returns:
+        --------
+        Returns value of loss function
+        '''        
+        return self.loss(yp, y)    
+        
+    #Given a predicted output and ground truth output simply return the derivative of the loss (depending on the loss function)            
+    def lossderiv(self,yp,y):
+        '''
+        Calculates derivative of loss function
+        Arguments:
+        ----------
+        yp: float
+            - prediction from one of output neurons
+        y: float
+            - ground truth that corresponds to yp
+
+        Returns:
+        --------
+        Returns value of loss derivative
+        '''        
+        return self.loss_deriv(yp, y)    
+>>>>>>> origin/main
         
     #Given a single input and desired output perform one step of backpropagation (including a forward pass, getting the derivative of the loss, and then calling calcwdeltas for layers with the right values             
-    def train(self,x,y):        
+    def train(self,x,y):
+        '''
+        Backpropogation function
+        Arguments:
+        ----------
+        x: numpy array
+            - input for network to train on
+        y: numpy array
+            - ground truth for network
+
+        Returns:
+        --------
+        No return value
+        '''        
         pred = self.calculate(x)
-        #l_deriv = self.lossderiv(np.array(pred), y)
 
         delt = np.zeros((1, self.n_n))
         for i in range(0, self.n_n):
@@ -315,7 +389,7 @@ if __name__ == '__main__':
     x = np.array([0.05,0.1])        
     y = np.array([0.01,0.99])
 
-    nn = NeuralNetwork(2, 2, 1, weights=w, lr=0.5, loss='binary')
+    nn = NeuralNetwork(2, 2, 2, weights=w, lr=0.5, loss='square')
     net_loss = []
     pred = nn.calculate(x)
     print(np.array(pred))
