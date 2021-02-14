@@ -287,11 +287,11 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         return out
     #Given a predicted output and ground truth output simply return the loss (depending on the loss function)    
     def calculateloss(self,yp,y):        
-        return self.loss(yp, y)    
+        return self.loss(yp, y)
         
     #Given a predicted output and ground truth output simply return the derivative of the loss (depending on the loss function)            
     def lossderiv(self,yp,y):        
-        return self.loss_deriv(yp, y)    
+        return self.loss_deriv(yp, y)
         
     #Given a single input and desired output perform one step of backpropagation (including a forward pass, getting the derivative of the loss, and then calling calcwdeltas for layers with the right values             
     def train(self,x,y):        
