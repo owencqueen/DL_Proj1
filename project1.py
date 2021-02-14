@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Neuron:
     def __init__(self, num_inputs, w_0, activation = 'logistic',  \
@@ -83,7 +84,8 @@ class Neuron:
         # Delta = dE/dOo1 * dOo1/dneto1
         dE_dO = sum(l1_deltas_x_w)
             # Summing all delta * w_i terms to account for partial of error
-
+        #print(self.output)
+        #print('XXXXXXXXXXXX')
         dO_dnet = self.activationderivative(self.output) 
             # Derviative of activation function, plugging in self.input
 
@@ -99,6 +101,7 @@ class Neuron:
 
         # Stores the vector of partial derivatives internally
         self.dE_dw = dE_dw
+        #print(self.dE_dw)
 
         # Return vector of delta * w
         # DON'T include bias
@@ -118,6 +121,8 @@ class Neuron:
         # Iterate over the weights and update based on 
         for i in range(self.n + 1):
             # self.n + 1 makes sure to include bias
+            #print(self.dE_dw[i])
+            #print(self.alpha)
             self.w[i] = self.w[i] - self.alpha * self.dE_dw[i]
 
 class FullyConnectedLayer:
@@ -211,15 +216,16 @@ class FullyConnectedLayer:
         --------
         all_deltas: list
             - delta values for all neurons in layer
-        ''' 
+        '''
 
         # Initialize matrix
         # Matrix to be returned from FCL to the NeuralNetwork
         #   - Each row contains w*delta vector for each neuron in the layer
-        new_delta_w = np.zeros(self.n_n, self.n_i)
+        new_delta_w = np.zeros((self.n_n, self.n_i))
 
         # Iterate over all neurons:
         for i in range(0, self.n_n):
+            #print("neuron: ", i)
             # Calculate delta value for this specific neuron:
             delta_i = self.neurons[i].calcpartialderivative(delta_w_matrix[:,i])
             # Add delta to the matrix
@@ -229,7 +235,7 @@ class FullyConnectedLayer:
         
         return new_delta_w
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
-    def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='binary', lr=0.01, weights=None):
+    def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
         '''
         Initializes the Neural Network
         Arguments:
@@ -253,11 +259,11 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         #set loss function
         #NOT SURE ABOUT BINARY LOSS
         if loss == 'binary':
-            self.loss = lambda y, y_hat: np.sum(-(y*np.log(y_hat) + (1-y)*np.log(1-y_hat)))
-            self.loss_deriv = lambda y, y_hat: -(y/y_hat) + ((1-y)/(1-y_hat))
+            self.loss = lambda y, y_hat: np.sum(-(y*np.log(y_hat) + (1-y)*np.log(1-y_hat)))/self.n_n
+            self.loss_deriv = lambda y_hat, y: -(y/y_hat) + ((1-y)/(1-y_hat))
         elif loss == 'square':
             self.loss = lambda y,y_hat: 0.5 * np.sum(np.square(y_hat - y))
-            self.loss_deriv = lambda x, y: -(y-x)
+            self.loss_deriv = lambda y_pred, y: -(y-y_pred)
 
         #set up network
         self.network = []
@@ -265,15 +271,16 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         tmp_layer = []
         for i in range(0, self.n_l):
             if weights is None:
-                tmp_layer = FullyConnectedLayer(self.n_n, self,n_n, activation)
+                tmp_layer = FullyConnectedLayer(self.n_n, self,n_n, activation=activation, learning_rate=lr)
             else:
-                tmp_layer = FullyConnectedLayer(self.n_n, self.n_n, activation, w_0=weights[i])
+                tmp_layer = FullyConnectedLayer(self.n_n, self.n_n, activation=activation, learning_rate=lr, w_0=weights[i])
             self.network.append(tmp_layer)
     
     #Given an input, calculate the output (using the layers calculate() method)    
-    def calculate(self,input):           
+    def calculate(self,input):
+        #calculate first layer output based on input           
         out = self.network[0].calculate(input)
-        # #number of hidden layers + output layer
+        # #number of hidden layers after first layer
         for i in range(1, self.n_l):
             out = self.network[i].calculate(out)
 
@@ -288,16 +295,15 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         
     #Given a single input and desired output perform one step of backpropagation (including a forward pass, getting the derivative of the loss, and then calling calcwdeltas for layers with the right values             
     def train(self,x,y):        
-        pred = calculate(x)
-        l_deriv = lossderiv(pred, y)
+        pred = self.calculate(x)
+        #l_deriv = self.lossderiv(np.array(pred), y)
 
-        delt = np.zeros((self.n_n, self.n_n))
-        #for j in range(0, delt.shape[1]):
-
+        delt = np.zeros((1, self.n_n))
+        for i in range(0, self.n_n):
+            delt[:, i] = self.lossderiv(np.array(pred)[i], y[i])
 
         for j in range(self.n_l-1, -1, -1):
             delt = self.network[j].calculatewdeltas(delt)
-
 
 
 if __name__ == '__main__':
@@ -309,7 +315,22 @@ if __name__ == '__main__':
     x = np.array([0.05,0.1])        
     y = np.array([0.01,0.99])
 
-    nn = NeuralNetwork(2, 2, 1, weights=w)
+    nn = NeuralNetwork(2, 2, 1, weights=w, lr=0.5, loss='binary')
+    net_loss = []
+    pred = nn.calculate(x)
+    print(np.array(pred))
+    print(nn.calculateloss(np.array(pred), y))
+    for i in range(0, 1000):
+        nn.train(x, y)
+        pred = nn.calculate(x)
+        print(np.array(pred))
+        ls = nn.calculateloss(np.array(pred), y)
+        print(ls)
+        net_loss.append(ls)
+
+    plt.plot(net_loss)
+    plt.show()
+
     pred = nn.calculate(x)
     print(np.array(pred))
     print(nn.calculateloss(np.array(pred), y))
