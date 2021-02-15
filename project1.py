@@ -266,7 +266,7 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
 
         #set loss function
         if loss == 'binary':
-            self.loss = lambda y, y_hat: np.sum(-(y*np.log(y_hat) + (1-y)*np.log(1-y_hat)))/self.n_n
+            self.loss = lambda y_hat, y: np.sum(-(y*np.log(y_hat) + (1-y)*np.log(1-y_hat)))/self.n_n
             self.loss_deriv = lambda y_hat, y: -(y/y_hat) + ((1-y)/(1-y_hat))
         elif loss == 'square':
             self.loss = lambda y,y_hat: 0.5 * np.sum(np.square(y_hat - y))
