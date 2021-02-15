@@ -525,7 +525,7 @@ if __name__ == '__main__':
 
         # ---------------------------
         # Neural net with 2 layers
-        nn = NeuralNetwork(2, [3, 1], 2, lr = 0.5, loss = 'binary')
+        nn = NeuralNetwork(2, [2, 1], 2, lr = 1, loss = 'binary')
 
         net_loss = []
         first = True
@@ -583,7 +583,7 @@ if __name__ == '__main__':
                 epn = i
 
         # Printing the final predictions:
-        print('Running XOR Logic Data (Network with 1 Hidden Layer)')
+        print('Running XOR Logic Data (Network with 3 Hidden Layers)')
         print('Input \t Prediction \t Ground Truth')
         for i in range(len(y_hat)):
             print('{} \t {:.6f} \t {}'.format(x[i], y_hat[i][0], y[i][0]))
