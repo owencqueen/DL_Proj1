@@ -2,6 +2,8 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
+# COSC 525 Project 1: Owen Queen and Sai Thatigotla
+
 class Neuron:
     def __init__(self, num_inputs, w_0, activation = 'logistic',  \
                 learning_rate = 0.01):
@@ -99,7 +101,6 @@ class Neuron:
 
         # Stores the vector of partial derivatives internally
         self.dE_dw = dE_dw
-        #print(self.dE_dw)
 
         # Return vector of delta * w
         # DON'T include bias
@@ -268,7 +269,6 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
 
         #set loss function
         if loss == 'binary':
-            #self.loss = lambda y, y_hat: np.sum(-(y*np.log(y_hat) + (1-y)*np.log(1-y_hat)))/self.n_n
             self.loss = lambda y_hat, y: np.sum([-(yt[0]*np.log(yh) + (1-yt[0])*np.log(1-yh)) for yh, yt in zip(y_hat, y)])/len(y)
             self.loss_deriv = lambda y_hat, y: -(y/y_hat) + ((1-y)/(1-y_hat))
         elif loss == 'square':
@@ -448,9 +448,18 @@ if __name__ == '__main__':
         nn.train(x, y)
         print('Calculated Outputs (after 1 epoch) =', nn.calculate(x))
         print("Weights in Network (please refer to in-class example for each weight's label):")
-        # Iterate over neuron 1:
 
-        # Iterate over neuron 2:
+        print('Weight \t Value')
+        # Iterate over neuron h1, h2:
+        count = 1
+        bcount = 1
+        for i in [0, 1]:
+            for j in [0, 1]:
+                print('w{} \t {}'.format(count, nn.network[i].neurons[j].w[0]))
+                print('w{} \t {}'.format(count + 1, nn.network[i].neurons[j].w[1]))
+                print('b{} \t {}'.format(bcount, nn.network[i].neurons[j].w[2]))
+                bcount += 1
+                count += 2
 
         print('Loss (MSE) after 1 Epoch =', nn.calculateloss(nn.calculate(x), y))
 
@@ -557,38 +566,4 @@ if __name__ == '__main__':
         print('')
 
         # Plot the loss curve
-        plot_one_loss_curve(net_loss, ep = ep)
-        # ------------------------
-        # Neural net with 3 layers
-        nn = NeuralNetwork(3, [2, 2, 1], 2, lr = 0.5, loss = 'binary')
-
-        net_loss = []
-        first = True
-
-        # Run for 100 epochs
-        for i in range(0, 10000):
-            for j in range(0, len(x)):
-                nn.train(x[j], y[j])
-
-            y_hat = [nn.calculate(xi) for xi in x]
-                
-            net_loss.append(nn.calculateloss(np.array(y_hat), y))
-
-            # Classify the predictions based on definition of sigmoid
-            y_hat_preds = np.array([0 if yh < 0.5 else 1 for yh in y_hat])
-
-            # Stop epochs early if predictions are correct:
-            if (check_logical_predictions(y_hat_preds, [0, 1, 1, 0]) and first):
-                first = False
-                epn = i
-
-        # Printing the final predictions:
-        print('Running XOR Logic Data (Network with 3 Hidden Layers)')
-        print('Input \t Prediction \t Ground Truth')
-        for i in range(len(y_hat)):
-            print('{} \t {:.6f} \t {}'.format(x[i], y_hat[i][0], y[i][0]))
-        print('Epoch of Convergence', epn)
-        print('Final Loss (Binary Cross Entropy) =', net_loss[-1])
-
-        # Plot the loss curve
-        plot_one_loss_curve(net_loss, ep = epn)
+        plot_one_loss_curve(net_loss, ep = ep, title = '1 Hidden Layer Loss vs. Epoch (XOR)')
