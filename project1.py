@@ -313,14 +313,6 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
 
         return out
     #Given a predicted output and ground truth output simply return the loss (depending on the loss function)    
-<<<<<<< HEAD
-    def calculateloss(self,yp,y):        
-        return self.loss(yp, y)
-        
-    #Given a predicted output and ground truth output simply return the derivative of the loss (depending on the loss function)            
-    def lossderiv(self,yp,y):        
-        return self.loss_deriv(yp, y)
-=======
     def calculateloss(self,yp,y):
         '''
         Calculates loss value
@@ -353,7 +345,6 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         Returns value of loss derivative
         '''        
         return self.loss_deriv(yp, y)    
->>>>>>> origin/main
         
     #Given a single input and desired output perform one step of backpropagation (including a forward pass, getting the derivative of the loss, and then calling calcwdeltas for layers with the right values             
     def train(self,x,y):
@@ -385,26 +376,30 @@ if __name__ == '__main__':
     #layer = FullyConnectedLayer(num_inputs = 2, num_neurons = 2, w_0 = w_0)
     #print(layer.calculate([2, 3]))
 
-    w = np.array([[[.15,.2,.35],[.25,.3,.35]],[[.4,.45,.6],[.5,.55,.6]]])        
-    x = np.array([0.05,0.1])        
-    y = np.array([0.01,0.99])
+    lrs = [0.001, 0.01, 0.1, 0.5, 1, 10, 100, 1000]
+    epochs = np.arange(1, 1001)
+    losses = []
 
-    nn = NeuralNetwork(2, 2, 2, weights=w, lr=0.5, loss='square')
-    net_loss = []
-    pred = nn.calculate(x)
-    print(np.array(pred))
-    print(nn.calculateloss(np.array(pred), y))
-    for i in range(0, 1000):
-        nn.train(x, y)
-        pred = nn.calculate(x)
-        print(np.array(pred))
-        ls = nn.calculateloss(np.array(pred), y)
-        print(ls)
-        net_loss.append(ls)
+    for j in range(0, len(lrs)):
+        w = np.array([[[.15,.2,.35],[.25,.3,.35]],[[.4,.45,.6],[.5,.55,.6]]])        
+        x = np.array([0.05,0.1])        
+        y = np.array([0.01,0.99])
 
-    plt.plot(net_loss)
+        nn = NeuralNetwork(2, 2, 2, weights=w, lr=lrs[j], loss='square')
+        net_loss = []
+        for i in range(len(epochs)):
+            nn.train(x, y)
+            pred = nn.calculate(x)
+            ls = nn.calculateloss(np.array(pred), y)
+            net_loss.append(ls)
+        losses.append(net_loss)
+
+    plt.xlabel("epochs")
+    plt.ylabel('loss')
+    plt.title('loss per epoch for different learning rates on example 1')
+    for k in range(len(losses)):
+        plt.plot(epochs,losses[k],label = 'lr: %s'%lrs[k])
+
+    plt.grid()
+    plt.legend()
     plt.show()
-
-    pred = nn.calculate(x)
-    print(np.array(pred))
-    print(nn.calculateloss(np.array(pred), y))
