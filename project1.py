@@ -376,7 +376,7 @@ if __name__ == '__main__':
     #layer = FullyConnectedLayer(num_inputs = 2, num_neurons = 2, w_0 = w_0)
     #print(layer.calculate([2, 3]))
 
-    lrs = [0.001, 0.01, 0.1, 0.5, 1, 10, 100, 1000]
+    lrs = [0.001, 0.01, 0.1, 0.5, 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000]
     epochs = np.arange(1, 1001)
     losses = []
 
@@ -393,6 +393,13 @@ if __name__ == '__main__':
             ls = nn.calculateloss(np.array(pred), y)
             net_loss.append(ls)
         losses.append(net_loss)
+        pred = nn.calculate(x)
+        print("learning rate: ", lrs[j])
+        print(pred)
+        ls = nn.calculateloss(np.array(pred), y)
+        print(ls)
+        print("------------------")
+
 
     plt.xlabel("epochs")
     plt.ylabel('loss')
