@@ -195,7 +195,7 @@ class FullyConnectedLayer:
             #   Note: this updates the internals of each neuron
             output.append(self.neurons[i].calculate(x))
 
-        return output
+        return np.array(output)
 
     def calculatewdeltas(self, delta_w_matrix):
         ''' 
@@ -229,6 +229,7 @@ class FullyConnectedLayer:
             self.neurons[i].updateweights()
         
         return new_delta_w
+
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
     def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
         '''
@@ -237,8 +238,9 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         ----------
         numOfLayers: int
             - number of hidden + output layers
-        numOfNeurons: int
+        numOfNeurons: (numOfLayers, ) list
             - number of neurons in each layer
+            - numOfNeurons[i] should be the number of neurons in the ith layer
         inputSize: int
             - number of inputs
         activation: string, optional
@@ -266,10 +268,11 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
 
         #set loss function
         if loss == 'binary':
-            self.loss = lambda y, y_hat: np.sum(-(y*np.log(y_hat) + (1-y)*np.log(1-y_hat)))/self.n_n
+            #self.loss = lambda y, y_hat: np.sum(-(y*np.log(y_hat) + (1-y)*np.log(1-y_hat)))/self.n_n
+            self.loss = lambda y_hat, y: np.sum([-(yt[0]*np.log(yh) + (1-yt[0])*np.log(1-yh)) for yh, yt in zip(y_hat, y)])/len(y)
             self.loss_deriv = lambda y_hat, y: -(y/y_hat) + ((1-y)/(1-y_hat))
         elif loss == 'square':
-            self.loss = lambda y,y_hat: 0.5 * np.sum(np.square(y_hat - y))
+            self.loss = lambda y_hat, y: 0.5 * np.sum(np.square(y_hat - y))
             self.loss_deriv = lambda y_pred, y: -(y-y_pred)
 
         #set up network
@@ -278,17 +281,18 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         #set up input layer
         in_layer = []
         if weights is None:
-            in_layer = FullyConnectedLayer(self.n_n, self,in_size, activation=activation, learning_rate=lr)
+            in_layer = FullyConnectedLayer(self.n_n[0], self.in_size, activation=activation, learning_rate=lr)
         else:
-            in_layer = FullyConnectedLayer(self.n_n, self.in_size, activation=activation, learning_rate=lr, w_0=weights[0])
+            in_layer = FullyConnectedLayer(self.n_n[0], self.in_size, activation=activation, learning_rate=lr, w_0=weights[0])
         self.network.append(in_layer)
 
+        # Set every layer thereafter
         tmp_layer = []
         for i in range(1, self.n_l):
             if weights is None:
-                tmp_layer = FullyConnectedLayer(self.n_n, self,n_n, activation=activation, learning_rate=lr)
+                tmp_layer = FullyConnectedLayer(self.n_n[i], self.n_n[i-1], activation=activation, learning_rate=lr)
             else:
-                tmp_layer = FullyConnectedLayer(self.n_n, self.n_n, activation=activation, learning_rate=lr, w_0=weights[i])
+                tmp_layer = FullyConnectedLayer(self.n_n[i], self.n_n[i-1], activation=activation, learning_rate=lr, w_0=weights[i])
             self.network.append(tmp_layer)
     
     #Given an input, calculate the output (using the layers calculate() method)    
@@ -312,6 +316,7 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
             out = self.network[i].calculate(out)
 
         return out
+
     #Given a predicted output and ground truth output simply return the loss (depending on the loss function)    
     def calculateloss(self,yp,y):
         '''
@@ -326,7 +331,7 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         Returns:
         --------
         Returns value of loss function
-        '''        
+        '''     
         return self.loss(yp, y)    
         
     #Given a predicted output and ground truth output simply return the derivative of the loss (depending on the loss function)            
@@ -363,39 +368,227 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         '''        
         pred = self.calculate(x)
 
-        delt = np.zeros((1, self.n_n))
-        for i in range(0, self.n_n):
+        delt = np.zeros((1, self.n_n[-1]))
+
+        # Calculate each loss function for start of backprop in last layer
+        for i in range(0, self.n_n[-1]):
             delt[:, i] = self.lossderiv(np.array(pred)[i], y[i])
 
+        # Flow of delta*w's backwards through network
         for j in range(self.n_l-1, -1, -1):
             delt = self.network[j].calculatewdeltas(delt)
 
+def check_logical_predictions(y_hat, y):
+    '''
+    Checks if predictions made for logical problems are correct (and, xor)
+    Arguments:
+    ----------
+    y_hat: (n, ) numpy array
+        - Predicted
+    y: (n, ) numpy array
+        - Ground truth
 
-if __name__ == '__main__':
-    #w_0 = np.array([[0, 0], [0, 0]])
-    #layer = FullyConnectedLayer(num_inputs = 2, num_neurons = 2, w_0 = w_0)
-    #print(layer.calculate([2, 3]))
+    Returns:
+    --------
+    result: bool
+        - True if y_hat == y
+        - False if y_hat != y
+    '''
+    for i in range(y_hat.shape[0]):
+        if (y[i] != y_hat[i]):
+            return False
+    return True
 
-    w = np.array([[[.15,.2,.35],[.25,.3,.35]],[[.4,.45,.6],[.5,.55,.6]]])        
-    x = np.array([0.05,0.1])        
-    y = np.array([0.01,0.99])
+def plot_one_loss_curve(losses, ep = None, title = 'Loss per Epochs'):
+    '''
+    Plots a singular loss curve over epochs
+    Arguments:
+    ----------
+    losses: (n, ) list
+        - Loss for network on each epoch
+        - n is number of epochs
+    ep: int, optional
+        - Default: None
+        - If None, doesn't plot the vertical line
+        - Epoch at which the network converged
+        - Will draw a vertical line at this point
+    title: string, optional
+        - Default: 'Loss per Epochs'
+        - Title for plot
 
-    nn = NeuralNetwork(2, 2, 2, weights=w, lr=0.5, loss='square')
-    net_loss = []
-    pred = nn.calculate(x)
-    print(np.array(pred))
-    print(nn.calculateloss(np.array(pred), y))
-    for i in range(0, 1000):
-        nn.train(x, y)
-        pred = nn.calculate(x)
-        print(np.array(pred))
-        ls = nn.calculateloss(np.array(pred), y)
-        print(ls)
-        net_loss.append(ls)
+    No return value
+    '''
+    plt.plot(losses, c = 'g')
+    plt.xlabel('epochs')
+    plt.ylabel('loss')
+    plt.title(title)
+    if ep is not None:
+        plt.vlines(ep, ymax = max(losses), ymin = min(losses), label = 'Epoch of Correct Predictions')
+        plt.legend()
 
-    plt.plot(net_loss)
+    plt.grid()
     plt.show()
 
-    pred = nn.calculate(x)
-    print(np.array(pred))
-    print(nn.calculateloss(np.array(pred), y))
+if __name__ == '__main__':
+
+    if len(sys.argv) < 2:
+        # Error checking for correct input
+        print('usage: python3 project1.py <option>')
+        print('\t Options: example, and, xor')
+        exit
+
+    elif sys.argv[1] == 'example':
+        w = np.array([[[.15,.2,.35],[.25,.3,.35]],[[.4,.45,.6],[.5,.55,.6]]])        
+        x = np.array([0.05,0.1])        
+        y = np.array([0.01,0.99])
+
+        # Neural network with 2 layers, 2 neurons per layer
+        nn = NeuralNetwork(2, [2, 2], 2, weights=w, lr=0.5, loss='square')
+        net_loss = []
+        nn.train(x, y)
+        print('Calculated Outputs (after 1 epoch) =', nn.calculate(x))
+        print("Weights in Network (please refer to in-class example for each weight's label):")
+        # Iterate over neuron 1:
+
+        # Iterate over neuron 2:
+
+        print('Loss (MSE) after 1 Epoch =', nn.calculateloss(nn.calculate(x), y))
+
+
+    elif sys.argv[1] == 'and':
+        # Initializing with random weights
+        x = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+        y = np.array([[0], [0], [0], [1]]) # Must wrap each label in a list (for generality)
+        nn = NeuralNetwork(1, [1], 2, lr = 0.1, loss = 'binary')
+
+        net_loss = []
+        first = True
+        for i in range(0, 100): #100 is maximum
+            for j in range(0, len(x)):
+                nn.train(x[j], y[j])
+
+            y_hat = [nn.calculate(xi) for xi in x]
+            #for j in range(0, len(x)):
+            #    y_hat.append(nn.calculate(x[j]))
+                
+            net_loss.append(nn.calculateloss(np.array(y_hat), y))
+
+            # Classify the predictions based on definition of sigmoid
+            y_hat_preds = np.array([0 if yh < 0.5 else 1 for yh in y_hat])
+
+            # Stop epochs early if predictions are correct:
+            if (check_logical_predictions(y_hat_preds, [0, 0, 0, 1]) and first):
+                first = False
+                ep = i
+
+        # Printing the final predictions:
+        print('Running AND Logic Data (1 Perceptron Network)')
+        print('Input \t Prediction \t Ground Truth')
+        for i in range(len(y_hat)):
+            print('{} \t {:.6f} \t {}'.format(x[i], y_hat[i][0], y[i][0]))
+        print('Epoch of Convergence', ep)
+        print('Final Loss (Binary Cross Entropy) =', net_loss[-1])
+
+        # Plot the loss curve
+        plot_one_loss_curve(net_loss, ep = ep, title = 'Loss per Epoch (AND)')
+
+    elif sys.argv[1] == 'xor':
+        x = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+        y = np.array([[0], [1], [1], [0]])
+
+        # Neural net with 1 perceptron
+        nn = NeuralNetwork(1, [1], 2, lr = 0.5, loss = 'binary')
+
+        net_loss = []
+
+        # Run for 100 epochs
+        for i in range(0, 10000):
+            for j in range(0, len(x)):
+                nn.train(x[j], y[j])
+
+            y_hat = [nn.calculate(xi) for xi in x]
+                
+            net_loss.append(nn.calculateloss(np.array(y_hat), y))
+
+            # Classify the predictions based on definition of sigmoid
+            y_hat_preds = np.array([0 if yh < 0.5 else 1 for yh in y_hat])
+
+        # Printing the final predictions:
+        print('Running XOR Logic Data (Single Perceptron)')
+        print('Input \t Prediction \t Ground Truth')
+        for i in range(len(y_hat)):
+            print('{} \t {:.6f} \t {}'.format(x[i], y_hat[i][0], y[i][0]))
+        print('Final Loss (Binary Cross Entropy) =', net_loss[-1])
+        print('')
+
+        plot_one_loss_curve(net_loss, title = 'Single Perceptron Loss vs. Epoch (XOR)')
+
+        # ---------------------------
+        # Neural net with 2 layers
+        nn = NeuralNetwork(2, [3, 1], 2, lr = 0.5, loss = 'binary')
+
+        net_loss = []
+        first = True
+
+        # Run for 100 epochs
+        for i in range(0, 10000):
+            for j in range(0, len(x)):
+                nn.train(x[j], y[j])
+
+            y_hat = [nn.calculate(xi) for xi in x]
+                
+            net_loss.append(nn.calculateloss(np.array(y_hat), y))
+
+            # Classify the predictions based on definition of sigmoid
+            y_hat_preds = np.array([0 if yh < 0.5 else 1 for yh in y_hat])
+
+            # Stop epochs early if predictions are correct:
+            if (check_logical_predictions(y_hat_preds, [0, 1, 1, 0]) and first):
+                first = False
+                ep = i
+
+        # Printing the final predictions:
+        print('Running XOR Logic Data (Network with 1 Hidden Layer)')
+        print('Input \t Prediction \t Ground Truth')
+        for i in range(len(y_hat)):
+            print('{} \t {:.6f} \t {}'.format(x[i], y_hat[i][0], y[i][0]))
+        print('Epoch of Convergence', ep)
+        print('Final Loss (Binary Cross Entropy) =', net_loss[-1])
+        print('')
+
+        # Plot the loss curve
+        plot_one_loss_curve(net_loss, ep = ep)
+        # ------------------------
+        # Neural net with 3 layers
+        nn = NeuralNetwork(3, [2, 2, 1], 2, lr = 0.5, loss = 'binary')
+
+        net_loss = []
+        first = True
+
+        # Run for 100 epochs
+        for i in range(0, 10000):
+            for j in range(0, len(x)):
+                nn.train(x[j], y[j])
+
+            y_hat = [nn.calculate(xi) for xi in x]
+                
+            net_loss.append(nn.calculateloss(np.array(y_hat), y))
+
+            # Classify the predictions based on definition of sigmoid
+            y_hat_preds = np.array([0 if yh < 0.5 else 1 for yh in y_hat])
+
+            # Stop epochs early if predictions are correct:
+            if (check_logical_predictions(y_hat_preds, [0, 1, 1, 0]) and first):
+                first = False
+                epn = i
+
+        # Printing the final predictions:
+        print('Running XOR Logic Data (Network with 1 Hidden Layer)')
+        print('Input \t Prediction \t Ground Truth')
+        for i in range(len(y_hat)):
+            print('{} \t {:.6f} \t {}'.format(x[i], y_hat[i][0], y[i][0]))
+        print('Epoch of Convergence', epn)
+        print('Final Loss (Binary Cross Entropy) =', net_loss[-1])
+
+        # Plot the loss curve
+        plot_one_loss_curve(net_loss, ep = epn)
