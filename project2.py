@@ -232,8 +232,76 @@ class FullyConnectedLayer:
         return new_delta_w
 
 class ConvolultionalLayer:
-	def __init__(self):
-		pass
+	def __init__(self, kernel_num, kernel_size, input_size, lr = 0.01, \
+        activation = 'logistic', weights = None):
+        
+        self.kernel_num = kernel_num
+        self.kernel_size = kernel_size
+        self.input_size = input_size
+        self.input_channels = input_size[0]
+
+        # Initialize neurons:
+        self.output_size = ((input_size[0] - kernel_size) + 1, (input_size[1] - kernel_size) + 1)
+        num_neurons = self.output_size[0] * self.output_size[1]
+
+        # TODO - Random initialization of weights
+
+        # Add each neuron:
+        self.kernels = []
+        for i in range(kernel_num):
+            self.kernels.append([]) # Append empty 
+            
+            for j in range(num_neurons): # Build one kernel's neurons
+                new_neuron = Neuron(num_inputs = \
+                        kernel_size * kernel_size * self.input_channels,
+                        activation = activation,
+                        learning_rate = lr,
+                        w_0 = self.w_0[i,:])
+                # Must have shared weights across kernels (i.e. using i)
+                # Each neuron has n*n*channels weights (input channels)
+                self.kernels[-1].append(new_neuron) # Add new neuron
+
+        # self.kernels[i] refers to the ith kernel's neurons
+
+    def calculate(self, x):
+        '''x has three dims - (channels, x_input, y_input)'''
+        
+        # Output of feedforward convolution:
+        output = np.zeros((self.kernel_num, self.output_size[0], self.output_size[1])) 
+
+        for k in range(self.kernel_num): # Over kernels
+            for i in range(self.output_size[0]): # Over rows
+                for j in range(self.output_size[1]): # Over cols
+                    
+                    #top_left of input = (i, j)
+                    
+                    # Make the indices we need to iterate over
+                    xvals = np.array([[i] * self.kernel_size for i in range(i, i + self.kernel_size)]).flatten()
+                    yvals = list(range(i, i + self.kernel_size)) * 3 
+                    indices_to_get = list(zip(xvals, yvals))
+
+                    # Extract input to neuron from x
+                    # Must get input from each channel here
+                    #   Concatenate all together and flatten for input
+                    neuron_input = []
+                    for channel in range(self.input_channels):
+                        neuron_input += [x[channel][ind[0]][ind[1]] for ind in indices_to_get]
+
+                    # Save calculation of neuron to output matrix
+                    # k - goes over kernels
+                    # i - goes over rows of each input matrix
+                    # j - goes over cols of each input matrix
+                    output[k,i,j] = self.kernel[k][i + j].calculate(neuron_input)
+
+        return output
+
+    def calculatewdeltas(self):
+        pass
+
+    def calcpartialderivative(self):
+        # Should perform updating of weights
+        pass
+
 
 
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
