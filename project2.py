@@ -4,6 +4,18 @@ import matplotlib.pyplot as plt
 
 # COSC 525 Project 2: Owen Queen and Sai Thatigotla
 
+def get_convolution_indices(tl_row, tl_col, kernel_size):
+    ''' 
+    Given top-left row and top-left column indices, gets the indices needed
+    for performing a convolution over that spot
+    '''
+    xvals = np.array([[i] * self.kernel_size for i in range(tl_row, tl_row + kernel_size)]).flatten()
+    yvals = list(range(tl_col, tl_col + kernel_size)) * 3 
+    indices_to_get = list(zip(xvals, yvals))
+    return indices_to_get
+
+
+
 class Neuron:
     def __init__(self, num_inputs, w_0, activation = 'logistic',  \
                 learning_rate = 0.01):
@@ -234,10 +246,13 @@ class FullyConnectedLayer:
 class ConvolultionalLayer:
 	def __init__(self, kernel_num, kernel_size, input_size, lr = 0.01, \
         activation = 'logistic', weights = None):
+        '''
+        input_size: (channels, x, y) array-like
+        '''
         
         self.kernel_num = kernel_num
         self.kernel_size = kernel_size
-        self.input_size = input_size
+        self.input_size = input_size[1:]
         self.input_channels = input_size[0]
 
         # Initialize neurons:
@@ -256,7 +271,8 @@ class ConvolultionalLayer:
                         kernel_size * kernel_size * self.input_channels,
                         activation = activation,
                         learning_rate = lr,
-                        w_0 = self.w_0[i,:])
+                        w_0 = list(self.w_0[i,:]) * self.input_channels)
+                # Weights for each neuron: w1, w2, ..., w9, w1, w2, ..., w9
                 # Must have shared weights across kernels (i.e. using i)
                 # Each neuron has n*n*channels weights (input channels)
                 self.kernels[-1].append(new_neuron) # Add new neuron
@@ -265,6 +281,10 @@ class ConvolultionalLayer:
 
     def calculate(self, x):
         '''x has three dims - (channels, x_input, y_input)'''
+
+        np[channel]
+
+        .reshape()
         
         # Output of feedforward convolution:
         output = np.zeros((self.kernel_num, self.output_size[0], self.output_size[1])) 
@@ -276,31 +296,82 @@ class ConvolultionalLayer:
                     #top_left of input = (i, j)
                     
                     # Make the indices we need to iterate over
-                    xvals = np.array([[i] * self.kernel_size for i in range(i, i + self.kernel_size)]).flatten()
-                    yvals = list(range(i, i + self.kernel_size)) * 3 
-                    indices_to_get = list(zip(xvals, yvals))
+                    indices_to_get = get_covolution_indices(i, j, self.kernel_size)
 
                     # Extract input to neuron from x
                     # Must get input from each channel here
                     #   Concatenate all together and flatten for input
                     neuron_input = []
                     for channel in range(self.input_channels):
+                        # Get input from each channel, put into same neuron
                         neuron_input += [x[channel][ind[0]][ind[1]] for ind in indices_to_get]
 
+                    #[w1*c1x1, w2*c1x2, ..., w1*c1x9, w2*c2x1, c2x2, ..., c96x1, .., c96x9] + b -> out ->  
                     # Save calculation of neuron to output matrix
                     # k - goes over kernels
                     # i - goes over rows of each input matrix
                     # j - goes over cols of each input matrix
-                    output[k,i,j] = self.kernel[k][i + j].calculate(neuron_input)
+                    output[k,i,j] = self.kernel[k][i + j].calculate(np.array(neuron_input))
 
         return output
 
-    def calculatewdeltas(self):
-        pass
+    def calculatewdeltas(self, delta_w_matrix):
+        '''
+        Two main tasks:
+            1. Calculate w*delta matrix to pass to l-1 layer
+            2. Perform weight updates for each neuron (thereby each weight in kernels)
 
-    def calcpartialderivative(self):
-        # Should perform updating of weights
-        pass
+        Arguments:
+        ----------
+        delta_w_matrix: (num_kernels in l+1 layer, num_neurons per kernel) numpy array
+            - Must be of this dimension for compatibility
+        '''
+
+        # Reshaping delta_w if needed:
+        # IRRELEVANT -------------------
+        #delta_w_matrix = delta_w_matrix.reshape((delta_w_matrix.shape[0], 1, delta_w_matrix.shape[1]))
+       
+       next_dw_mat = []
+
+        # Performing convolutions to perform weight updates w/in each kernel
+
+        for k in range(self.kernel_num): # Over kernels
+            # Setting up matrix of zeros for dE's wrt each w in kernel - calculated in Neuron class
+            #dE_dwi_matrix = np.zeros((self.kernel_size, self.kernel_size))
+
+            # dE_doutx should be same size as input to layer
+            # [0] is height, [1] is width
+            #dE_doutx = np.zeros((self.input_size[0], self.input_size[1]))
+            dE_doutx = np.zeros(self.input_size[0] * self.input_size[1])
+
+            for i in range(self.output_size[0]): # Over rows
+                for j in range(self.output_size[1]): # Over cols
+                    # Make the indices we need to consider in dE_doutx
+                    conv_inds = get_covolution_indices(i, j, self.kernel_size)
+
+                    # Get current delta_w matrix back
+                    # Also pass delta_w from l+1 portion backwards
+                    #current_delta_w = self.kernel[k][i + j].calcpartialderivative(delta_w_matrix[k, :,(i + j)])
+                    current_delta_w = self.kernel[k][i + j].calcpartialderivative(delta_w_matrix[:,(i + j)])
+                    self.kernel[k][i + j].updateweights()
+
+                    # Add current_delta_w to appropriate location (conv_inds) in dE_doutx
+                    for i in len(current_delta_w):
+                        ci, cj = conv_inds[i]
+                        #dE_doutx[ci, cj] += current_delta_w
+                        dE_doutx[ci + cj] += current_delta_w
+
+            next_dw_mat.append(dE_doutx) # Append to list that will comprise dw matrix
+
+        #[1, 2, 3, 4],
+        #[5, 6, 7, 8],
+        #[...],
+        #...
+        #[...] n kernels
+
+        next_dw_mat = np.array(next_dw_mat)
+
+        return next_dw_mat
 
 
 
