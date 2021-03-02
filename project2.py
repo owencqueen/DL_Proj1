@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
 
 # COSC 525 Project 2: Owen Queen and Sai Thatigotla
 
@@ -235,6 +236,44 @@ class ConvolultionalLayer:
 	def __init__(self):
 		pass
 
+class MaxPoolingLayer:
+    def __init__(self, kernel_size, input_dim):
+        self.k_s = kernel_size
+        self.i_d = input_dim
+
+    def calculate(self, input):
+        self.max_loc = np.zeros(input.shape)
+        out_dim = ((i_d - k_s)/k_s)+1
+        feature_map = np.array((out_dim, out_dim))
+        for i in range(out_dim):
+            for j in range(out_dim):
+                sub_arr = input[(i*k_s): (i*k_s)+k_s, (j*k_s): (j*k_s)+k_s]
+                ind = np.unravel_index(np.argmax(sub_arr, axis=None), sub_arr.shape)
+                feature_map[i][j] = sub_arr[ind]
+                max_loc[(i*k_s)+ind[0]][(j*k_s)+ind[1]] = 1
+
+        #save indexes better?
+
+        return feature_map
+
+    def calculatewdeltas(self, input):
+        output = copy.deepcopy(max_loc)
+
+        for i in range(input.shape[0]):
+            for j in range(input.shape[1]):
+                output[(i*k_s): (i*k_s)+k_s, (j*k_s): (j*k_s)+k_s] *= input[i, j]
+
+        return output
+
+class FlattenLayer:
+    def __init__(self, input):
+        self.i_s = input.shape
+
+    def calculate(self, input):
+        return np.resize(input, ((input.shape[0]*input.shape[1]),1))
+        
+    def calculatewdeltas(self, input):
+        return np.resize(input, i_s)
 
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
     def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
