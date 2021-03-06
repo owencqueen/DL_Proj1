@@ -23,8 +23,6 @@ def get_convolution_indices(tl_row, tl_col, depth, kernel_size):
 
     return xy_matrices
 
-
-
 class Neuron:
     def __init__(self, num_inputs, w_0, activation = 'logistic',  \
                 learning_rate = 0.01):
@@ -174,6 +172,7 @@ class FullyConnectedLayer:
         # Set numbers for layers:
         self.n_i = num_inputs
         self.n_n = num_neurons
+        self.output_size = [num_neurons] # Need for NeuralNetwork compatibility
 
         # Set up the neurons:
         self.neurons = []
@@ -252,7 +251,7 @@ class FullyConnectedLayer:
         
         return new_delta_w
 
-class ConvolultionalLayer:
+class ConvolutionalLayer:
     
     def __init__(self, kernel_num, kernel_size, input_size, lr = 0.01, \
                     activation = 'logistic', w_0 = None):
@@ -268,7 +267,7 @@ class ConvolultionalLayer:
         self.input_channels = input_size[0]
 
         # Initialize neurons:
-        self.output_size = ((input_size[0] - kernel_size) + 1, (input_size[1] - kernel_size) + 1)
+        self.output_size = [(input_size[0] - kernel_size) + 1, (input_size[1] - kernel_size) + 1, self.kernel_num]
         num_neurons = self.output_size[0] * self.output_size[1]
 
         #Random initialization of weights
@@ -417,6 +416,7 @@ class ConvolultionalLayer:
         #[...] n kernels
 
         #next_dw_mat = np.array(next_dw_mat)
+        dE_doutx.shape == input_size
 
         return dE_doutx
 
@@ -460,22 +460,14 @@ class FlattenLayer:
         return np.resize(input, i_s)
 
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
-    def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
+    #def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
+    def __init__(self, inputSize, loss='square', lr=.001):
         '''
         Initializes the Neural Network
         Arguments:
         ----------
-        numOfLayers: int
-            - number of hidden + output layers
-        numOfNeurons: (numOfLayers, ) list
-            - number of neurons in each layer
-            - numOfNeurons[i] should be the number of neurons in the ith layer
         inputSize: int
             - number of inputs
-        activation: string, optional
-            - Default: 'logistic'
-            - Options: 'logistic', 'linear'
-            - Specifies the activation function to be used by each neuron in layer
         loss: string, optional
             - Default: 'square'
             - Options: 'square' (square loss), 'binary' (binary cross-entropy loss)
@@ -483,17 +475,12 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         lr: float, optional
             - Default: 0.001
             - learning rate for backpropagation
-        weights: numpy array, optional
-            - Default: None
-            - weights to load into network
         Returns
         -------
         No return value
         '''      
-
-        self.n_l = numOfLayers
-        self.n_n = numOfNeurons
         self.in_size = inputSize
+        self.lr = lr
 
         #set loss function
         if loss == 'binary':
@@ -506,22 +493,61 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         #set up network
         self.network = []
 
-        #set up input layer
-        in_layer = []
-        if weights is None:
-            in_layer = FullyConnectedLayer(self.n_n[0], self.in_size, activation=activation, learning_rate=lr)
-        else:
-            in_layer = FullyConnectedLayer(self.n_n[0], self.in_size, activation=activation, learning_rate=lr, w_0=weights[0])
-        self.network.append(in_layer)
+    def addLayer(self, layer_type, num_neurons = 0, kernel_size = 3, num_kernels = 0, 
+                    activation = 'sigmoid', weights = None):
 
-        # Set every layer thereafter
-        tmp_layer = []
-        for i in range(1, self.n_l):
-            if weights is None:
-                tmp_layer = FullyConnectedLayer(self.n_n[i], self.n_n[i-1], activation=activation, learning_rate=lr)
-            else:
-                tmp_layer = FullyConnectedLayer(self.n_n[i], self.n_n[i-1], activation=activation, learning_rate=lr, w_0=weights[i])
-            self.network.append(tmp_layer)
+        '''
+        Arguments:
+        ----------
+        layer_type: string
+            - Denotes type of layer to be added
+            - Options: 'Conv' (convolutional), 'FC' (fully-connected), 'Pool' (Max Pooling), and 'Flatten' (flattening layer)
+        num_neurons: int, optional
+            - Default:
+            - Required in: 'FC'
+                - If given 'FC' as type, will throw an error 
+        kernel_size: int, optional
+            - Required in: 'Conv', 'Pool'
+        num_kernels: int, optional
+            - Required in: 'Conv'
+        activation: string, optional
+            - Default: 'logistic'
+            - Activation function to use throughout the additional layer
+            - If layer_type == 'Flatten' or 'Pool', this is ignored
+        weights: np array, optional
+            - Default: None
+            - If None, weights are generated randomly
+            - Weights must match dimensions specified by your given layer
+            - If layer_type == 'Flatten' or 'Pool', this is ignored
+        ''' 
+
+        # Get input size from previous layer
+        if len(self.network) > 0:
+            input_size = self.network[-1].output_size
+        elif input_size is None:
+            # If no layers added, get input size to entire network
+            input_size = self.in_size
+
+        if layer_type == 'Conv':
+            new_layer = ConvolutionalLayer(num_kernels, kernel_size, input_size, self.lr, activation, 'w_0')
+            self.network.append(new_layer)
+            
+        elif layer_type == 'FC':
+
+            if (len(input_size) > 1):
+                # Throw error if user forgets a flatten layer
+                print('Must have Flatten Layer before FC')
+                exit
+
+            # Note: if weights are left to be generated randomly, will be done in layer
+            new_layer = FullyConnectedLayer(num_neurons, input_size, self.lr, activation, w_0 = weights)
+            self.network.append(new_layer)
+
+        elif layer_type == 'Pool':
+            pass # blank until pool and flatten added
+
+        elif layer_type == 'Flatten':
+            pass # blank until pool and flatten added
     
     #Given an input, calculate the output (using the layers calculate() method)    
     def calculate(self,input):
@@ -540,7 +566,7 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         #calculate first layer output based on input           
         out = self.network[0].calculate(input)
         # #number of hidden layers after first layer
-        for i in range(1, self.n_l):
+        for i in range(0, range(len(self.network))):
             out = self.network[i].calculate(out)
 
         return out
@@ -596,14 +622,18 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         '''        
         pred = self.calculate(x)
 
-        delt = np.zeros((1, self.n_n[-1]))
+        # Get number of neurons in last layer:
+        n_last = self.network[-1].n_n
+
+        # Set up delta
+        delt = np.zeros((1, n_last))
 
         # Calculate each loss function for start of backprop in last layer
-        for i in range(0, self.n_n[-1]):
+        for i in range(0, n_last):
             delt[:, i] = self.lossderiv(np.array(pred)[i], y[i])
 
         # Flow of delta*w's backwards through network
-        for j in range(self.n_l-1, -1, -1):
+        for j in range(len(self.network) - 1, -1, -1):
             delt = self.network[j].calculatewdeltas(delt)
 
 def check_logical_predictions(y_hat, y):
