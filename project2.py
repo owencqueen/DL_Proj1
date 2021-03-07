@@ -415,13 +415,29 @@ class ConvolutionalLayer:
 
         return dE_doutx
 
+#TODO : Add channels for arrays
 class MaxPoolingLayer:
     def __init__(self, kernel_size, input_dim):
         self.k_s = kernel_size
         self.i_d = input_dim
 
+        out = ((input_dim[1] - kernel_size)/kernel_size)+1
+        self.output_size = [input_dim[0], out, out]
+
     def calculate(self, input):
         self.max_loc = np.zeros(input.shape)
+        feature_map = np.array(output_size)
+
+        for i in range(input.shape[0]):
+            #iterate over channels
+            for j in range(output_size[1]):
+                for k in range(output_size[2]):
+                    sub_arr = input[i, (j*k_s): (j*k_s)+k_s, (k*k_s): (k*k_s)+k_s]
+                    ind = np.unravel_index(np.argmax(sub_arr, axis=None), sub_arr.shape)
+                    feature_map[i][j][k] = sub_arr[ind]
+                    max_loc[i][(j*k_s)+ind[0]][(k*k_s)+ind[1]] = 1
+
+        """
         out_dim = ((i_d - k_s)/k_s)+1
         feature_map = np.array((out_dim, out_dim))
         for i in range(out_dim):
@@ -430,6 +446,7 @@ class MaxPoolingLayer:
                 ind = np.unravel_index(np.argmax(sub_arr, axis=None), sub_arr.shape)
                 feature_map[i][j] = sub_arr[ind]
                 max_loc[(i*k_s)+ind[0]][(j*k_s)+ind[1]] = 1
+        """
 
         #save indexes better?
 
@@ -440,19 +457,21 @@ class MaxPoolingLayer:
 
         for i in range(input.shape[0]):
             for j in range(input.shape[1]):
-                output[(i*k_s): (i*k_s)+k_s, (j*k_s): (j*k_s)+k_s] *= input[i, j]
+                for k in range(input.shape[2]):
+                    output[i, (j*k_s): (j*k_s)+k_s, (k*k_s): (k*k_s)+k_s] *= input[i, j, k]
 
         return output
 
 class FlattenLayer:
     def __init__(self, input):
         self.i_s = input.shape
+        self.output_size = [i_s[0]*i_s[1]*i_s[2], 1]
 
     def calculate(self, input):
-        return np.resize(input, ((input.shape[0]*input.shape[1]),1))
+        return np.reshape(input, -1)
         
     def calculatewdeltas(self, input):
-        return np.resize(input, i_s)
+        return np.reshape(input, i_s)
 
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
     #def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
