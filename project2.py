@@ -421,7 +421,7 @@ class MaxPoolingLayer:
         self.k_s = kernel_size
         self.i_d = input_dim
 
-        out = ((input_dim[1] - kernel_size)/kernel_size)+1
+        out = np.floor(((input_dim[1] - kernel_size)/kernel_size)+1)
         self.output_size = [input_dim[0], out, out]
 
     def calculate(self, input):
