@@ -5,6 +5,24 @@ import copy
 
 # COSC 525 Project 2: Owen Queen and Sai Thatigotla
 
+def get_convolution_indices(tl_row, tl_col, depth, kernel_size):
+    ''' 
+    Given top-left row and top-left column indices, gets the indices needed
+    for performing a convolution over that spot
+    '''
+    xvals = np.array([[i] * kernel_size for i in range(tl_row, tl_row + kernel_size)]).flatten()
+    yvals = list(range(tl_col, tl_col + kernel_size)) * 3
+
+    #indices_to_get = list(zip(xvals, yvals))
+    xy = list(zip(xvals, yvals)) # Stacks xy's together
+    xy_matrices = []
+    for z in range(depth): 
+        # Repeats xy list for every z value needed (corresponding to channels)
+        for el in xy:
+            xy_matrices.append((el[0], el[1], z))
+
+    return xy_matrices
+
 class Neuron:
     def __init__(self, num_inputs, w_0, activation = 'logistic',  \
                 learning_rate = 0.01):
@@ -154,6 +172,7 @@ class FullyConnectedLayer:
         # Set numbers for layers:
         self.n_i = num_inputs
         self.n_n = num_neurons
+        self.output_size = [num_neurons] # Need for NeuralNetwork compatibility
 
         # Set up the neurons:
         self.neurons = []
@@ -232,9 +251,174 @@ class FullyConnectedLayer:
         
         return new_delta_w
 
-class ConvolultionalLayer:
-	def __init__(self):
-		pass
+class ConvolutionalLayer:
+    
+    def __init__(self, kernel_num, kernel_size, input_size, lr = 0.01, \
+                    activation = 'logistic', w_0 = None):
+        ''' 
+        input_size: (channels, x, y) array-like 
+        
+        weights: (num_kernels, kernel_size, kernel_size)
+
+        '''
+        self.kernel_num = kernel_num
+        self.kernel_size = kernel_size
+        self.input_size = input_size[1:]
+        self.input_channels = input_size[0]
+
+        # Initialize neurons:
+        self.output_size = [(input_size[0] - kernel_size) + 1, (input_size[1] - kernel_size) + 1, self.kernel_num]
+        num_neurons = self.output_size[0] * self.output_size[1]
+
+        #Random initialization of weights
+        try:
+            if w_0 == None:
+                # Choose random values on uniform distribution in [0,1)
+                # Size is <kernel number> x <self.input_channels> x <kernel_size> x <kernel_size>
+                self.w_0 = np.random.rand(self.kernel_num, self.input_channels,
+                                    self.kernel_size, self.kernel_size)
+
+        except ValueError: # Catches if w_0 is already given
+            self.w_0 = w_0
+
+        # Add each neuron:
+        self.kernels = []
+        for i in range(kernel_num):
+            self.kernels.append([]) # Append empty 
+            
+            for j in range(num_neurons): # Build one kernel's neurons
+                new_neuron = Neuron(num_inputs = \
+                        self.kernel_size * self.kernel_size * self.input_channels,
+                        activation = activation,
+                        learning_rate = lr,
+                        w_0 = self.w_0[i].flatten())
+                # Weights for each neuron: w1, w2, ..., w9, w1, w2, ..., w9
+                # Must have shared weights across kernels (i.e. using i)
+                # Each neuron has n*n*channels weights (input channels)
+                self.kernels[-1].append(new_neuron) # Add new neuron
+
+        # self.kernels[i] refers to the ith kernel's neurons
+
+    def calculate(self, x):
+        '''x has three dims - (channels, x_input, y_input)'''
+
+        #np[channel]
+
+        #.reshape()
+        
+        # Output of feedforward convolution:
+        output = np.zeros((self.kernel_num, self.output_size[0], self.output_size[1])) 
+
+        for k in range(self.kernel_num): # Over kernels
+            for i in range(self.output_size[0]): # Over rows
+                for j in range(self.output_size[1]): # Over cols
+                    
+                    #top_left of input = (i, j)
+                    
+                    # Make the indices we need to iterate over
+                    indices_to_get = get_convolution_indices(i, j, self.input_channels, self.kernel_size)
+
+                    # Extract input to neuron from x
+                    # Concatenate all together and flatten for input
+                    # Get input from each channel, put into same neuron
+                    neuron_input = np.array([x[channel][x][y] for x, y, channel in indices_to_get])
+                        # Puts all input in a 1d array
+
+                    #for channel in range(self.input_channels):
+                        
+                        #neuron_input += [x[channel][ind[0]][ind[1]] for ind in indices_to_get]
+
+                    # Save calculation of neuron to output matrix
+                    # k - goes over kernels
+                    # i - goes over rows of each input matrix
+                    # j - goes over cols of each input matrix
+                    output[k,i,j] = self.kernel[k][i + j].calculate(neuron_input)
+
+        return output
+
+    def calculatewdeltas(self, delta_w_matrix):
+        '''
+        Two main tasks:
+            1. Calculate w*delta matrix to pass to l-1 layer
+            2. Perform weight updates for each neuron (thereby each weight in kernels)
+
+        Arguments:
+        ----------
+        delta_w_matrix: (output_size[0], output_size[1]) array
+            - Must be of this dimension for compatibility
+            - Only one channel - acts as if its repeated over multiple channels
+        '''
+
+        # Reshaping delta_w if needed:
+        # IRRELEVANT -------------------
+        #delta_w_matrix = delta_w_matrix.reshape((delta_w_matrix.shape[0], 1, delta_w_matrix.shape[1]))
+
+        next_dw_mat = []
+
+        dE_doutx = np.zeros((self.input_channels, self.input_size[0], self.input_size[1]))
+
+        # Performing convolutions to perform weight updates w/in each kernel
+        for k in range(self.kernel_num): # Over kernels
+            # Setting up matrix of zeros for dE's wrt each w in kernel - calculated in Neuron class
+            #dE_dwi_matrix = np.zeros((self.kernel_size, self.kernel_size))
+
+            # dE_doutx should be same size as input to layer
+            # [0] is height, [1] is width
+            #dE_doutx = np.zeros((self.input_size[0], self.input_size[1]))
+            
+
+            for i in range(self.output_size[0]): # Over rows
+                for j in range(self.output_size[1]): # Over cols
+                    # Make the indices we need to consider in dE_doutx
+                    # These indices correspond to our current neuron
+                    conv_inds = get_convolution_indices(i, j, self.input_channels, self.kernel_size)
+                        # i: top-left x value
+                        # j: top-left y values
+                        # self.input_channels: depth/num. channels in input
+                        # self.kernel_size: size of kernel
+
+                    # Get neuron's context (for a given kernel k) from delta_w matrix
+                    delta_w_ij = [delta_w_matrix[channel, x, y] for x, y, channel in conv_inds]
+
+                    # Calculate the partial derivatives
+                    current_delta_w = self.kernel[k][i + j].calcpartialderivative(delta_w_ij)
+                        # Should be size (self.input_channels x self.kernel_size x self.kernel_size), but in 1D
+                    
+                    # Therefore, we need to reshape it and perform the element-wise addition/convolution
+                    current_delta_w = np.reshape(current_delta_w, (self.input_channels, self.kernel_size, self.kernel_size))
+
+                    # We repeatedly add to the dE_doutx in an element-wise fashion
+                    #   Do this over our neuron's context within the tensor
+                    #   Note that the tensor is the same size as input
+                    # Must do this over EVERY CHANNEL (i.e. : in first spot)
+                    dE_doutx[:, i:(i + self.kernel_size), j:(j + self.kernel_size)] += current_delta_w
+
+                    # Need to pass convolved version of delta_w matrix backwards:
+
+                    # Also pass delta_w from l+1 portion backwards
+                    #current_delta_w = self.kernel[k][i + j].calcpartialderivative(delta_w_matrix[k, :,(i + j)])
+                    
+                    # Update the weights for the neuron we're currently on
+                    self.kernel[k][i + j].updateweights()
+
+                    # Add current_delta_w to appropriate location (conv_inds) in dE_doutx
+                    #for i in len(current_delta_w):
+                    #    ci, cj = conv_inds[i]
+                        #dE_doutx[ci, cj] += current_delta_w
+                        #dE_doutx[ci + cj] += current_delta_w
+
+            #next_dw_mat.append(dE_doutx) # Append to list that will comprise dw matrix
+
+        #[1, 2, 3, 4],
+        #[5, 6, 7, 8],
+        #[...],
+        #...
+        #[...] n kernels
+
+        #next_dw_mat = np.array(next_dw_mat)
+        dE_doutx.shape == input_size
+
+        return dE_doutx
 
 #TODO : Add channels for arrays
 class MaxPoolingLayer:
@@ -282,22 +466,14 @@ class FlattenLayer:
         return np.resize(input, i_s)
 
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
-    def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
+    #def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
+    def __init__(self, inputSize, loss='square', lr=.001):
         '''
         Initializes the Neural Network
         Arguments:
         ----------
-        numOfLayers: int
-            - number of hidden + output layers
-        numOfNeurons: (numOfLayers, ) list
-            - number of neurons in each layer
-            - numOfNeurons[i] should be the number of neurons in the ith layer
         inputSize: int
             - number of inputs
-        activation: string, optional
-            - Default: 'logistic'
-            - Options: 'logistic', 'linear'
-            - Specifies the activation function to be used by each neuron in layer
         loss: string, optional
             - Default: 'square'
             - Options: 'square' (square loss), 'binary' (binary cross-entropy loss)
@@ -305,17 +481,12 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         lr: float, optional
             - Default: 0.001
             - learning rate for backpropagation
-        weights: numpy array, optional
-            - Default: None
-            - weights to load into network
         Returns
         -------
         No return value
         '''      
-
-        self.n_l = numOfLayers
-        self.n_n = numOfNeurons
         self.in_size = inputSize
+        self.lr = lr
 
         #set loss function
         if loss == 'binary':
@@ -328,22 +499,61 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         #set up network
         self.network = []
 
-        #set up input layer
-        in_layer = []
-        if weights is None:
-            in_layer = FullyConnectedLayer(self.n_n[0], self.in_size, activation=activation, learning_rate=lr)
-        else:
-            in_layer = FullyConnectedLayer(self.n_n[0], self.in_size, activation=activation, learning_rate=lr, w_0=weights[0])
-        self.network.append(in_layer)
+    def addLayer(self, layer_type, num_neurons = 0, kernel_size = 3, num_kernels = 0, 
+                    activation = 'sigmoid', weights = None):
 
-        # Set every layer thereafter
-        tmp_layer = []
-        for i in range(1, self.n_l):
-            if weights is None:
-                tmp_layer = FullyConnectedLayer(self.n_n[i], self.n_n[i-1], activation=activation, learning_rate=lr)
-            else:
-                tmp_layer = FullyConnectedLayer(self.n_n[i], self.n_n[i-1], activation=activation, learning_rate=lr, w_0=weights[i])
-            self.network.append(tmp_layer)
+        '''
+        Arguments:
+        ----------
+        layer_type: string
+            - Denotes type of layer to be added
+            - Options: 'Conv' (convolutional), 'FC' (fully-connected), 'Pool' (Max Pooling), and 'Flatten' (flattening layer)
+        num_neurons: int, optional
+            - Default:
+            - Required in: 'FC'
+                - If given 'FC' as type, will throw an error 
+        kernel_size: int, optional
+            - Required in: 'Conv', 'Pool'
+        num_kernels: int, optional
+            - Required in: 'Conv'
+        activation: string, optional
+            - Default: 'logistic'
+            - Activation function to use throughout the additional layer
+            - If layer_type == 'Flatten' or 'Pool', this is ignored
+        weights: np array, optional
+            - Default: None
+            - If None, weights are generated randomly
+            - Weights must match dimensions specified by your given layer
+            - If layer_type == 'Flatten' or 'Pool', this is ignored
+        ''' 
+
+        # Get input size from previous layer
+        if len(self.network) > 0:
+            input_size = self.network[-1].output_size
+        elif input_size is None:
+            # If no layers added, get input size to entire network
+            input_size = self.in_size
+
+        if layer_type == 'Conv':
+            new_layer = ConvolutionalLayer(num_kernels, kernel_size, input_size, self.lr, activation, 'w_0')
+            self.network.append(new_layer)
+            
+        elif layer_type == 'FC':
+
+            if (len(input_size) > 1):
+                # Throw error if user forgets a flatten layer
+                print('Must have Flatten Layer before FC')
+                exit
+
+            # Note: if weights are left to be generated randomly, will be done in layer
+            new_layer = FullyConnectedLayer(num_neurons, input_size, self.lr, activation, w_0 = weights)
+            self.network.append(new_layer)
+
+        elif layer_type == 'Pool':
+            pass # blank until pool and flatten added
+
+        elif layer_type == 'Flatten':
+            pass # blank until pool and flatten added
     
     #Given an input, calculate the output (using the layers calculate() method)    
     def calculate(self,input):
@@ -362,7 +572,7 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         #calculate first layer output based on input           
         out = self.network[0].calculate(input)
         # #number of hidden layers after first layer
-        for i in range(1, self.n_l):
+        for i in range(0, range(len(self.network))):
             out = self.network[i].calculate(out)
 
         return out
@@ -418,14 +628,18 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         '''        
         pred = self.calculate(x)
 
-        delt = np.zeros((1, self.n_n[-1]))
+        # Get number of neurons in last layer:
+        n_last = self.network[-1].n_n
+
+        # Set up delta
+        delt = np.zeros((1, n_last))
 
         # Calculate each loss function for start of backprop in last layer
-        for i in range(0, self.n_n[-1]):
+        for i in range(0, n_last):
             delt[:, i] = self.lossderiv(np.array(pred)[i], y[i])
 
         # Flow of delta*w's backwards through network
-        for j in range(self.n_l-1, -1, -1):
+        for j in range(len(self.network) - 1, -1, -1):
             delt = self.network[j].calculatewdeltas(delt)
 
 def check_logical_predictions(y_hat, y):
