@@ -111,24 +111,38 @@ def run_example1(option = 'keras'):
         print(np.squeeze(model.get_weights()[3]))
     
     elif option == 'project':
+
+        #print(np.concatenate((l1k1.flatten(), l1b1)))
+        #print(np.concatenate((l1k1.flatten(), l1b1)).shape)
+
         # Add layers + initialize with weights
-        cnn = NeuralNetwork(inputSize = (5, 5, 1), loss = 'square', lr = 100)
+        cnn = NeuralNetwork(inputSize = (1, 5, 5), loss = 'square', lr = 100)
         cnn.addLayer(layer_type = 'Conv', kernel_size = 3, num_kernels = 1, \
-            activation = 'sigmoid', weights = np.concatenate((l1k1.flatten(), l1b1)))
+            activation = 'logistic', weights = np.concatenate((l1k1.flatten(), l1b1)).reshape(1,10))
         cnn.addLayer(layer_type = 'Flatten')
-        cnn.addLayer(layer_type = 'FC', num_neurons = 1, activation = 'sigmoid', \
-            weights = np.concatenate((l2w, l2b)))
+        cnn.addLayer(layer_type = 'FC', num_neurons = 1, activation = 'logistic', \
+            weights = np.concatenate((l2w.flatten(), l2b)).reshape(1,np.concatenate((l2w.flatten(), l2b)).shape[0]))
 
         np.set_printoptions(precision = 5)
 
+        input = np.reshape(input, (1, 5, 5))
+
         print('model output before:')
-        print(cnn.calculate(np.reshape(input, (1, 5, 5))))
+        print(cnn.calculate(input))
 
         # Train the network
         cnn.train(input, output)
+        out = cnn.calculate(input)
+        print(out)
 
         # Get weights:
-        cnn.network[0]
+        kernel1 = cnn.network[0].kernels[0][0].w
+        print('Kernel 1 weights:', kernel1[:-1])
+        print('Kernel 1 bias:', kernel1[-1])
+
+        fc = cnn.network[-1].neurons[0].w
+        print('FC 1 weights:', fc[:-1])
+        print('FC 1 bias:', fc[-1])
 
 
 def run_example2(option = 'keras'):
@@ -268,4 +282,4 @@ def run_example3(option = 'keras'):
         pass
 
 if __name__ == '__main__':
-    run_example3('keras')
+    run_example1('project')

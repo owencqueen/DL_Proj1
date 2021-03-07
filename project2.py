@@ -21,6 +21,7 @@ def get_convolution_indices(tl_row, tl_col, depth, kernel_size):
         for el in xy:
             xy_matrices.append((el[0], el[1], z))
 
+    print(xy_matrices)
     return xy_matrices
 
 class Neuron:
@@ -79,6 +80,8 @@ class Neuron:
 
         # Formula: W*x + b (W is weights vector, b is bias)
         # Saves the output to the Neuron
+        print(self.w)
+        print('n', self.n)
         self.output = np.dot(self.w[:self.n], x) + self.w[-1]
 
         return self.activate(self.output) # Returns the output
@@ -267,19 +270,18 @@ class ConvolutionalLayer:
         self.input_channels = input_size[0]
 
         # Initialize neurons:
-        self.output_size = [(input_size[0] - kernel_size) + 1, (input_size[1] - kernel_size) + 1, self.kernel_num]
-        num_neurons = self.output_size[0] * self.output_size[1]
+        self.output_size = [self.kernel_num, (input_size[1] - kernel_size) + 1, (input_size[2] - kernel_size) + 1]
+        num_neurons = self.output_size[1] * self.output_size[2]
 
         #Random initialization of weights
-        try:
-            if w_0 == None:
-                # Choose random values on uniform distribution in [0,1)
-                # Size is <kernel number> x <self.input_channels> x <kernel_size> x <kernel_size>
-                # Make each weight flat, with each index indicating a new weight
-                self.w_0 = np.random.rand(self.kernel_num, self.input_channels *
-                                    self.kernel_size * self.kernel_size + 1)
+        if w_0 is None:
+            # Choose random values on uniform distribution in [0,1)
+            # Size is <kernel number> x <self.input_channels> x <kernel_size> x <kernel_size>
+            # Make each weight flat, with each index indicating a new weight
+            self.w_0 = np.random.rand(self.kernel_num, self.input_channels *
+                                self.kernel_size * self.kernel_size + 1)
 
-        except ValueError: # Catches if w_0 is already given
+        else: # Catches if w_0 is already given
             self.w_0 = w_0
 
         # Add each neuron:
@@ -308,21 +310,26 @@ class ConvolutionalLayer:
         #.reshape()
         
         # Output of feedforward convolution:
-        output = np.zeros((self.kernel_num, self.output_size[0], self.output_size[1])) 
+        output = np.zeros(self.output_size) 
+
+        print('kernel num', self.kernel_num)
 
         for k in range(self.kernel_num): # Over kernels
-            for i in range(self.output_size[0]): # Over rows
-                for j in range(self.output_size[1]): # Over cols
+            for i in range(self.output_size[1]): # Over rows
+                for j in range(self.output_size[2]): # Over cols
                     
                     #top_left of input = (i, j)
                     
                     # Make the indices we need to iterate over
+                    #print('input channels', self.input_channels)
                     indices_to_get = get_convolution_indices(i, j, self.input_channels, self.kernel_size)
 
                     # Extract input to neuron from x
                     # Concatenate all together and flatten for input
                     # Get input from each channel, put into same neuron
-                    neuron_input = np.array([x[channel][x][y] for x, y, channel in indices_to_get])
+                    print('x', x)
+                    print(x.shape)
+                    neuron_input = np.array([x[channel][z][y] for z, y, channel in indices_to_get])
                         # Puts all input in a 1d array
 
                     #for channel in range(self.input_channels):
@@ -333,8 +340,11 @@ class ConvolutionalLayer:
                     # k - goes over kernels
                     # i - goes over rows of each input matrix
                     # j - goes over cols of each input matrix
-                    output[k,i,j] = self.kernel[k][i + j].calculate(neuron_input)
+                    output[k,i,j] = self.kernels[k][i + j].calculate(neuron_input)
 
+            print('kernel', k)
+
+        print('OUTPUT SIZE', output.shape)
         return output
 
     def calculatewdeltas(self, delta_w_matrix):
@@ -368,8 +378,8 @@ class ConvolutionalLayer:
             #dE_doutx = np.zeros((self.input_size[0], self.input_size[1]))
             
 
-            for i in range(self.output_size[0]): # Over rows
-                for j in range(self.output_size[1]): # Over cols
+            for i in range(self.output_size[1]): # Over rows
+                for j in range(self.output_size[2]): # Over cols
                     # Make the indices we need to consider in dE_doutx
                     # These indices correspond to our current neuron
                     conv_inds = get_convolution_indices(i, j, self.input_channels, self.kernel_size)
@@ -379,10 +389,13 @@ class ConvolutionalLayer:
                         # self.kernel_size: size of kernel
 
                     # Get neuron's context (for a given kernel k) from delta_w matrix
-                    delta_w_ij = [delta_w_matrix[channel, x, y] for x, y, channel in conv_inds]
+                    print(delta_w_matrix)
+                    print(delta_w_matrix.shape)
+                    #delta_w_ij = [delta_w_matrix[channel, x, y] for x, y, channel in conv_inds]
+                    delta_w_ij = [delta_w_matrix[k, i, j]]
 
                     # Calculate the partial derivatives
-                    current_delta_w = self.kernel[k][i + j].calcpartialderivative(delta_w_ij)
+                    current_delta_w = self.kernels[k][i + j].calcpartialderivative(delta_w_ij)
                         # Should be size (self.input_channels x self.kernel_size x self.kernel_size), but in 1D
                     
                     # Therefore, we need to reshape it and perform the element-wise addition/convolution
@@ -400,7 +413,7 @@ class ConvolutionalLayer:
                     #current_delta_w = self.kernel[k][i + j].calcpartialderivative(delta_w_matrix[k, :,(i + j)])
                     
                     # Update the weights for the neuron we're currently on
-                    self.kernel[k][i + j].updateweights()
+                    self.kernels[k][i + j].updateweights()
 
                     # Add current_delta_w to appropriate location (conv_inds) in dE_doutx
                     #for i in len(current_delta_w):
@@ -411,7 +424,7 @@ class ConvolutionalLayer:
             #next_dw_mat.append(dE_doutx) # Append to list that will comprise dw matrix
 
         #next_dw_mat = np.array(next_dw_mat)
-        dE_doutx.shape == input_size
+        #dE_doutx.shape == input_size
 
         return dE_doutx
 
@@ -426,16 +439,16 @@ class MaxPoolingLayer:
 
     def calculate(self, input):
         self.max_loc = np.zeros(input.shape)
-        feature_map = np.array(output_size)
+        feature_map = np.zeros(self.output_size)
 
         for i in range(input.shape[0]):
             #iterate over channels
-            for j in range(output_size[1]):
-                for k in range(output_size[2]):
-                    sub_arr = input[i, (j*k_s): (j*k_s)+k_s, (k*k_s): (k*k_s)+k_s]
+            for j in range(self.output_size[1]):
+                for k in range(self.output_size[2]):
+                    sub_arr = input[i, (j*self.k_s): (j*self.k_s)+self.k_s, (k*self.k_s): (k*self.k_s)+self.k_s]
                     ind = np.unravel_index(np.argmax(sub_arr, axis=None), sub_arr.shape)
                     feature_map[i][j][k] = sub_arr[ind]
-                    max_loc[i][(j*k_s)+ind[0]][(k*k_s)+ind[1]] = 1
+                    self.max_loc[i][(j*self.k_s)+ind[0]][(k*self.k_s)+ind[1]] = 1
 
         """
         out_dim = ((i_d - k_s)/k_s)+1
@@ -453,25 +466,27 @@ class MaxPoolingLayer:
         return feature_map
 
     def calculatewdeltas(self, input):
-        output = copy.deepcopy(max_loc)
+        output = copy.deepcopy(self.max_loc)
 
         for i in range(input.shape[0]):
             for j in range(input.shape[1]):
                 for k in range(input.shape[2]):
-                    output[i, (j*k_s): (j*k_s)+k_s, (k*k_s): (k*k_s)+k_s] *= input[i, j, k]
+                    output[i, (j*self.k_s): (j*self.k_s)+self.k_s, (k*self.k_s): (k*self.k_s)+self.k_s] *= input[i, j, k]
 
         return output
 
 class FlattenLayer:
-    def __init__(self, input):
-        self.i_s = input.shape
-        self.output_size = [i_s[0]*i_s[1]*i_s[2], 1]
+    def __init__(self, input_size):
+        print('FLATTEN INPUT SIZE', input_size)
+        self.i_s = input_size
+        #self.output_size = [self.i_s[0] * self.i_s[1] * self.i_s[2], 1]
+        self.output_size = [self.i_s[0] * self.i_s[1] * self.i_s[2]]
 
     def calculate(self, input):
         return np.reshape(input, -1)
         
     def calculatewdeltas(self, input):
-        return np.reshape(input, i_s)
+        return np.reshape(input, self.i_s)
 
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
     #def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
@@ -501,14 +516,16 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
             self.loss = lambda y_hat, y: np.sum([-(yt[0]*np.log(yh) + (1-yt[0])*np.log(1-yh)) for yh, yt in zip(y_hat, y)])/len(y)
             self.loss_deriv = lambda y_hat, y: -(y/y_hat) + ((1-y)/(1-y_hat))
         elif loss == 'square':
-            self.loss = lambda y_hat, y: 0.5 * np.sum(np.square(y_hat - y))
-            self.loss_deriv = lambda y_pred, y: -(y-y_pred)
+            #self.loss = lambda y_hat, y: 0.5 * np.sum(np.square(y_hat - y))
+            self.loss = lambda y_hat, y: np.sum(np.square(y_hat - y))
+            self.loss_deriv = lambda y_pred, y: 2 * (y_pred - y)
+            #self.loss_deriv = lambda y_pred, y: -(y-y_pred)
 
         #set up network
         self.network = []
 
     def addLayer(self, layer_type, num_neurons = 0, kernel_size = 3, num_kernels = 0, 
-                    activation = 'sigmoid', weights = None):
+                    activation = 'logistic', weights = None):
 
         '''
         Arguments:
@@ -538,12 +555,13 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         # Get input size from previous layer
         if len(self.network) > 0:
             input_size = self.network[-1].output_size
-        elif input_size is None:
+        #elif input_size is None:
+        else:
             # If no layers added, get input size to entire network
             input_size = self.in_size
 
         if layer_type == 'Conv':
-            new_layer = ConvolutionalLayer(num_kernels, kernel_size, input_size, self.lr, activation, 'w_0')
+            new_layer = ConvolutionalLayer(num_kernels, kernel_size, input_size, self.lr, activation, w_0 = weights)
             self.network.append(new_layer)
             
         elif layer_type == 'FC':
@@ -554,14 +572,19 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
                 exit
 
             # Note: if weights are left to be generated randomly, will be done in layer
-            new_layer = FullyConnectedLayer(num_neurons, input_size, self.lr, activation, w_0 = weights)
+            new_layer = FullyConnectedLayer(num_neurons, input_size[0], self.lr, activation, w_0 = weights)
             self.network.append(new_layer)
 
         elif layer_type == 'Pool':
-            pass # blank until pool and flatten added
+            # blank until pool and flatten added
+            new_layer = MaxPoolingLayer(kernel_size = kernel_size, input_dim = input_size)
+            self.network.append(new_layer)
 
         elif layer_type == 'Flatten':
-            pass # blank until pool and flatten added
+            # blank until pool and flatten added
+            new_layer = FlattenLayer(input_size)
+            self.network.append(new_layer)
+
     
     #Given an input, calculate the output (using the layers calculate() method)    
     def calculate(self,input):
@@ -578,10 +601,14 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
             - output from network's ouptut layer
         '''
         #calculate first layer output based on input           
-        out = self.network[0].calculate(input)
+        #out = self.network[0].calculate(input)
+        out = input
         # #number of hidden layers after first layer
-        for i in range(0, range(len(self.network))):
+        for i in range(0, len(self.network)):
+            print('**************layer num', i)
             out = self.network[i].calculate(out)
+            print('out', out)
+            print('out shape', out.shape)
 
         return out
 
