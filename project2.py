@@ -275,8 +275,9 @@ class ConvolutionalLayer:
             if w_0 == None:
                 # Choose random values on uniform distribution in [0,1)
                 # Size is <kernel number> x <self.input_channels> x <kernel_size> x <kernel_size>
-                self.w_0 = np.random.rand(self.kernel_num, self.input_channels,
-                                    self.kernel_size, self.kernel_size)
+                # Make each weight flat, with each index indicating a new weight
+                self.w_0 = np.random.rand(self.kernel_num, self.input_channels *
+                                    self.kernel_size * self.kernel_size + 1)
 
         except ValueError: # Catches if w_0 is already given
             self.w_0 = w_0
@@ -291,7 +292,7 @@ class ConvolutionalLayer:
                         self.kernel_size * self.kernel_size * self.input_channels,
                         activation = activation,
                         learning_rate = lr,
-                        w_0 = self.w_0[i].flatten())
+                        w_0 = self.w_0[i, :].flatten())
                 # Weights for each neuron: w1, w2, ..., w9, w1, w2, ..., w9
                 # Must have shared weights across kernels (i.e. using i)
                 # Each neuron has n*n*channels weights (input channels)
@@ -408,12 +409,6 @@ class ConvolutionalLayer:
                         #dE_doutx[ci + cj] += current_delta_w
 
             #next_dw_mat.append(dE_doutx) # Append to list that will comprise dw matrix
-
-        #[1, 2, 3, 4],
-        #[5, 6, 7, 8],
-        #[...],
-        #...
-        #[...] n kernels
 
         #next_dw_mat = np.array(next_dw_mat)
         dE_doutx.shape == input_size
