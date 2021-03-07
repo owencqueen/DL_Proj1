@@ -48,7 +48,23 @@ def generateExample2():
     return l1k1,l1k2,l1b1,l1b2,l2c1,l2c2,l2b,l3,l3b,input,output
 
 def generateExample3():
-    pass
+    np.random.seed(30)
+    
+    # input + output for network
+    input = np.random.rand(8, 8)
+    output = np.random.rand(1)
+
+    # Convolutional layer kernels and biases
+    l1k1 = np.random.rand(3, 3, 1, 1)
+    l1b1 = np.random.rand(1)
+    l1k2 = np.random.rand(3, 3, 1, 1)
+    l1b2 = np.random.rand(1)
+
+    # Final layer weights and bias
+    l3w = np.random.rand(18, 1)
+    l3b = np.random.rand(1)
+
+    return l1k1, l1b1, l1k2, l1b2, l3w, l3b, input, output
 
 def run_example1(option = 'keras'):
     '''
@@ -95,7 +111,25 @@ def run_example1(option = 'keras'):
         print(np.squeeze(model.get_weights()[3]))
     
     elif option == 'project':
-        pass
+        # Add layers + initialize with weights
+        cnn = NeuralNetwork(inputSize = (5, 5, 1), loss = 'square', lr = 100)
+        cnn.addLayer(layer_type = 'Conv', kernel_size = 3, num_kernels = 1, \
+            activation = 'sigmoid', weights = np.concatenate((l1k1.flatten(), l1b1)))
+        cnn.addLayer(layer_type = 'Flatten')
+        cnn.addLayer(layer_type = 'FC', num_neurons = 1, activation = 'sigmoid', \
+            weights = np.concatenate((l2w, l2b)))
+
+        np.set_printoptions(precision = 5)
+
+        print('model output before:')
+        print(cnn.calculate(np.reshape(input, (1, 5, 5))))
+
+        # Train the network
+        cnn.train(input, output)
+
+        # Get weights:
+        cnn.network[0]
+
 
 def run_example2(option = 'keras'):
     '''
@@ -188,11 +222,50 @@ def run_example3(option = 'keras'):
         - Options: 'keras' or 'project'
     '''
 
+    l1k1, l1b1, l1k2, l1b2, l3w, l3b, input, output = generateExample3()
+
     if option == 'keras':
-        pass
+        model = Sequential()
+        model.add(layers.Conv2D(2, 3, input_shape = (8, 8, 1), activation = 'sigmoid'))
+        model.add(layers.MaxPool2D((2, 2), strides = 2))
+        model.add(layers.Flatten())
+        model.add(layers.Dense(1, activation = 'sigmoid'))
+
+        # Initialize the weights
+        model.layers[0].set_weights([np.concatenate((l1k1, l1k2), axis = 3), np.array([l1b1[0], l1b2[0]])])
+        model.layers[3].set_weights([l3w, l3b])
+
+        # Expand dimensions of input image
+        img=np.expand_dims(input,axis=(0,3))
+
+        # Printing parameters:
+        np.set_printoptions(precision=5)
+        print('model output before:')
+        print(model.predict(img))
+        sgd = optimizers.SGD(lr=100)
+        model.compile(loss='MSE', optimizer=sgd, metrics=['accuracy'])
+        history=model.fit(img,output,batch_size=1,epochs=1)
+        print('model output after:')
+        print(model.predict(img))
+
+        print('1st convolutional layer, 1st kernel weights:')
+        print(np.squeeze(model.get_weights()[0][:,:,0,0]))
+        print('1st convolutional layer, 1st kernel bias:')
+        print(np.squeeze(model.get_weights()[1][0]))
+
+        print('1st convolutional layer, 2nd kernel weights:')
+        print(np.squeeze(model.get_weights()[0][:,:,0,1]))
+        print('1st convolutional layer, 2nd kernel bias:')
+        print(np.squeeze(model.get_weights()[1][1]))
+
+        print('fully connected layer weights:')
+        print(np.squeeze(model.get_weights()[2]))
+        print('fully connected layer bias:')
+        print(np.squeeze(model.get_weights()[3]))
+
     
     elif option == 'project':
         pass
 
 if __name__ == '__main__':
-    run_example1('keras')
+    run_example3('keras')
