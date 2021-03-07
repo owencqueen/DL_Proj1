@@ -236,13 +236,18 @@ class ConvolultionalLayer:
 	def __init__(self):
 		pass
 
+#TODO : Add channels for arrays
 class MaxPoolingLayer:
     def __init__(self, kernel_size, input_dim):
         self.k_s = kernel_size
         self.i_d = input_dim
+        self.output_shape
 
     def calculate(self, input):
         self.max_loc = np.zeros(input.shape)
+
+
+        """
         out_dim = ((i_d - k_s)/k_s)+1
         feature_map = np.array((out_dim, out_dim))
         for i in range(out_dim):
@@ -251,6 +256,7 @@ class MaxPoolingLayer:
                 ind = np.unravel_index(np.argmax(sub_arr, axis=None), sub_arr.shape)
                 feature_map[i][j] = sub_arr[ind]
                 max_loc[(i*k_s)+ind[0]][(j*k_s)+ind[1]] = 1
+        """
 
         #save indexes better?
 
