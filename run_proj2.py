@@ -8,6 +8,7 @@ from tensorflow.keras import optimizers
 from project2 import *
 
 def generateExample1():
+    # Gets consistent weights in same manner as 2, 3 versions
     np.random.seed(20)
 
     net_input = np.random.rand(5, 5)
@@ -113,9 +114,6 @@ def run_example1(option = 'keras'):
     
     elif option == 'project':
 
-        #print(np.concatenate((l1k1.flatten(), l1b1)))
-        #print(np.concatenate((l1k1.flatten(), l1b1)).shape)
-
         # Add layers + initialize with weights
         cnn = NeuralNetwork(inputSize = (1, 5, 5), loss = 'square', lr = 100)
         cnn.addLayer(layer_type = 'Conv', kernel_size = 3, num_kernels = 1, \
@@ -138,12 +136,16 @@ def run_example1(option = 'keras'):
 
         # Get weights:
         kernel1 = cnn.network[0].kernels[0][0].w
-        print('Kernel 1 weights:', kernel1[:-1])
-        print('Kernel 1 bias:', kernel1[-1])
+        print('1st convolutional layer, 1st kernel weights:')
+        print(kernel1[:-1].reshape((3, 3)))
+        print('1st convolutional layer, 1st kernel bias:')
+        print(kernel1[-1])
 
         fc = cnn.network[-1].neurons[0].w
-        print('FC 1 weights:', fc[:-1])
-        print('FC 1 bias:', fc[-1])
+        print('fully connected layer weights:')
+        print(fc[:-1])
+        print('fully connected layer bias:')
+        print(fc[-1])
 
 
 def run_example2(option = 'keras'):
@@ -267,7 +269,6 @@ def run_example2(option = 'keras'):
         print(kernel2[-1])
 
         kernel1_layer2 = cnn.network[1].kernels[0][0].w
-        #kernel2_layer2 = cnn.network[1].kernels[1][0].w
         print('2nd convolutional layer weights:')
         print(kernel1_layer2[:-1].reshape(2, 3, 3))
         print('2nd convolutional layer bias:')
