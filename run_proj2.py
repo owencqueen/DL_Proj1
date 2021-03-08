@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
@@ -248,20 +249,35 @@ def run_example2(option = 'keras'):
         # Train the network
         cnn.train(input, output)
         out = cnn.calculate(input)
+        print('model output after:')
         print(out)
 
+        np.set_printoptions(precision=5)
         # Get weights:
         kernel1 = cnn.network[0].kernels[0][0].w
-        print('layer 1 Kernel 1 weights:', kernel1[:-1])
-        print('layer 1 Kernel 1 bias:', kernel1[-1])
+        print('1st convolutional layer, 1st kernel weights:')
+        print(kernel1[:-1].reshape((3, 3)))
+        print('1st convolutional layer, 1st kernel bias:')
+        print(kernel1[-1])
 
         kernel2 = cnn.network[0].kernels[1][0].w
-        print('layer 1 Kernel 2 weights:', kernel2[:-1])
-        print('layer 1 Kernel 2 bias:', kernel2[-1])
+        print('1st convolutional layer, 2nd kernel weights:')
+        print(kernel2[:-1].reshape((3, 3)))
+        print('1st convolutional layer, 2nd kernel bias:')
+        print(kernel2[-1])
+
+        kernel1_layer2 = cnn.network[1].kernels[0][0].w
+        #kernel2_layer2 = cnn.network[1].kernels[1][0].w
+        print('2nd convolutional layer weights:')
+        print(kernel1_layer2[:-1].reshape(2, 3, 3))
+        print('2nd convolutional layer bias:')
+        print(kernel1_layer2[-1])
 
         fc = cnn.network[-1].neurons[0].w
-        print('FC 1 weights:', fc[:-1])
-        print('FC 1 bias:', fc[-1])
+        print('fully connected layer weights:')
+        print(fc[:-1])
+        print('fully connected layer bias:')
+        print(fc[-1])
 
 def run_example3(option = 'keras'):
     '''
@@ -314,7 +330,6 @@ def run_example3(option = 'keras'):
         print('fully connected layer bias:')
         print(np.squeeze(model.get_weights()[3]))
 
-    
     elif option == 'project':
         cnn = NeuralNetwork(inputSize = (1, 8, 8), loss = 'square', lr = 100)
         cnn.addLayer(layer_type = 'Conv', kernel_size = 3, num_kernels = 2, \
@@ -337,16 +352,39 @@ def run_example3(option = 'keras'):
         # Train the network
         cnn.train(input, output)
         out = cnn.calculate(input)
+        print('model output after:')
         print(out)
 
+        np.set_printoptions(precision=5)
         # Get weights:
         kernel1 = cnn.network[0].kernels[0][0].w
-        print('Kernel 1 weights:', kernel1[:-1])
-        print('Kernel 1 bias:', kernel1[-1])
+        print('1st convolutional layer, 1st kernel weights:')
+        print(kernel1[:-1].reshape((3, 3)))
+        print('1st convolutional layer, 1st kernel bias:')
+        print(kernel1[-1])
+
+        kernel2 = cnn.network[0].kernels[1][0].w
+        print('1st convolutional layer, 2nd kernel weights:')
+        print(kernel2[:-1].reshape((3, 3)))
+        print('1st convolutional layer, 2nd kernel bias:')
+        print(kernel2[-1])
 
         fc = cnn.network[-1].neurons[0].w
-        print('FC 1 weights:', fc[:-1])
-        print('FC 1 bias:', fc[-1])
+        print('fully connected layer weights:')
+        print(fc[:-1])
+        print('fully connected layer bias:')
+        print(fc[-1])
 
 if __name__ == '__main__':
-    run_example3('keras')
+    # Options for running the code
+    if len(sys.argv) < 3:
+        print("usage: python3 run_proj2.py <example number> <'keras' or 'project'>")
+
+    elif sys.argv[1] == '1':
+        run_example1(sys.argv[2])
+
+    elif sys.argv[1] == '2':
+        run_example2(sys.argv[2])
+
+    elif sys.argv[1] == '3':
+        run_example3(sys.argv[2])
