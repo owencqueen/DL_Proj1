@@ -435,10 +435,11 @@ class MaxPoolingLayer:
         self.i_d = input_dim
 
         out = np.floor(((input_dim[1] - kernel_size)/kernel_size)+1)
-        self.output_size = [input_dim[0], out, out]
+        self.output_size = [input_dim[0], int(out), int(out)]
 
     def calculate(self, input):
         self.max_loc = np.zeros(input.shape)
+        print('out size: ',self.output_size)
         feature_map = np.zeros(self.output_size)
 
         for i in range(input.shape[0]):
@@ -447,6 +448,8 @@ class MaxPoolingLayer:
                 for k in range(self.output_size[2]):
                     sub_arr = input[i, (j*self.k_s): (j*self.k_s)+self.k_s, (k*self.k_s): (k*self.k_s)+self.k_s]
                     ind = np.unravel_index(np.argmax(sub_arr, axis=None), sub_arr.shape)
+                    #rint('ind: ', ind)
+                    #print('feature_map: ', feature_map)
                     feature_map[i][j][k] = sub_arr[ind]
                     self.max_loc[i][(j*self.k_s)+ind[0]][(k*self.k_s)+ind[1]] = 1
 
