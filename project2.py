@@ -401,68 +401,99 @@ class ConvolutionalLayer:
         #dE_doutx.shape == input_size
 
         return dE_doutx
-
-#TODO : Add channels for arrays
 class MaxPoolingLayer:
+    """2D Max Pooling layer class
+    """
     def __init__(self, kernel_size, input_dim):
+        """Max pooling constructor
+
+        Args:
+            kernel_size (int): dimension of sqaure kernel
+            input_dim (list): 3 element list (channels, x, y) of input shape to layer
+        """
         self.k_s = kernel_size
         self.i_d = input_dim
 
         out = np.floor(((input_dim[1] - kernel_size)/kernel_size)+1)
+        # size of output feature maps
         self.output_size = [input_dim[0], int(out), int(out)]
 
     def calculate(self, input):
+        """Function for forward pass
+
+        Args:
+            input (ndarray): Numpy array of layer input (channels, x, y)
+
+        Returns:
+            ndarray: output array of max pooling
+        """
         self.max_loc = np.zeros(input.shape)
-        print('out size: ',self.output_size)
         feature_map = np.zeros(self.output_size)
 
         for i in range(input.shape[0]):
             #iterate over channels
             for j in range(self.output_size[1]):
                 for k in range(self.output_size[2]):
+                    # Create sub array of input to pool over
                     sub_arr = input[i, (j*self.k_s): (j*self.k_s)+self.k_s, (k*self.k_s): (k*self.k_s)+self.k_s]
                     ind = np.unravel_index(np.argmax(sub_arr, axis=None), sub_arr.shape)
-                    #rint('ind: ', ind)
-                    #print('feature_map: ', feature_map)
                     feature_map[i][j][k] = sub_arr[ind]
+                    # Saves max location in input for backprop
                     self.max_loc[i][(j*self.k_s)+ind[0]][(k*self.k_s)+ind[1]] = 1
-
-        """
-        out_dim = ((i_d - k_s)/k_s)+1
-        feature_map = np.array((out_dim, out_dim))
-        for i in range(out_dim):
-            for j in range(out_dim):
-                sub_arr = input[(i*k_s): (i*k_s)+k_s, (j*k_s): (j*k_s)+k_s]
-                ind = np.unravel_index(np.argmax(sub_arr, axis=None), sub_arr.shape)
-                feature_map[i][j] = sub_arr[ind]
-                max_loc[(i*k_s)+ind[0]][(j*k_s)+ind[1]] = 1
-        """
-
-        #save indexes better?
 
         return feature_map
 
     def calculatewdeltas(self, input):
+        """Backpropagation for max pooling
+
+        Args:
+            input (ndarray): numpy array of input for backprop (channels, x ,y)
+
+        Returns:
+            ndarray: output of backpropogation of max pooling (channels, x, y)
+        """
         output = copy.deepcopy(self.max_loc)
 
         for i in range(input.shape[0]):
             for j in range(input.shape[1]):
                 for k in range(input.shape[2]):
+                    # Multiply splice of output array by the update
                     output[i, (j*self.k_s): (j*self.k_s)+self.k_s, (k*self.k_s): (k*self.k_s)+self.k_s] *= input[i, j, k]
 
         return output
 
 class FlattenLayer:
+    """Flatten layer
+    """
     def __init__(self, input_size):
-        print('FLATTEN INPUT SIZE', input_size)
+        """Constructor
+
+        Args:
+            input_size (list): list of input size (channels, x, y)
+        """
         self.i_s = input_size
-        #self.output_size = [self.i_s[0] * self.i_s[1] * self.i_s[2], 1]
         self.output_size = [self.i_s[0] * self.i_s[1] * self.i_s[2]]
 
     def calculate(self, input):
+        """Reshapes input to flatten
+
+        Args:
+            input (ndarray): numpy array to flatten (channels, x, y)
+
+        Returns:
+            ndarray: flattened input 1D ndarray
+        """
         return np.reshape(input, -1)
         
     def calculatewdeltas(self, input):
+        """Reshape into original input
+
+        Args:
+            input (ndarray): 1D numpy array to reshape
+
+        Returns:
+            ndarray: (channels, x, y)
+        """
         return np.reshape(input, self.i_s)
 
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
