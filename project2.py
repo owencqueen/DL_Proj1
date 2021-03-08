@@ -9,11 +9,25 @@ def get_convolution_indices(tl_row, tl_col, depth, kernel_size):
     ''' 
     Given top-left row and top-left column indices, gets the indices needed
     for performing a convolution over that spot
+    Arguments:
+    ----------
+    tl_row: int
+        - Row index of the top-left spot in your convolution area
+    tl_col: int
+        - Column index of the top-left spot in your convolution area
+    depth: int
+        - Depth of the image/data you are convolving over
+    kernel_size: int
+        - Size of kernel used in convolution
+
+    Returns:
+    --------
+    xy_matrices: list of tuples
+        - Gives a list (1-dimensional) of tuples that correspond to indices to use in convolution
     '''
     xvals = np.array([[i] * kernel_size for i in range(tl_row, tl_row + kernel_size)]).flatten()
     yvals = list(range(tl_col, tl_col + kernel_size)) * 3
 
-    #indices_to_get = list(zip(xvals, yvals))
     xy = list(zip(xvals, yvals)) # Stacks xy's together
     xy_matrices = []
     for z in range(depth): 
@@ -21,7 +35,6 @@ def get_convolution_indices(tl_row, tl_col, depth, kernel_size):
         for el in xy:
             xy_matrices.append((el[0], el[1], z))
 
-    print(xy_matrices)
     return xy_matrices
 
 class Neuron:
@@ -31,7 +44,7 @@ class Neuron:
         Arguments:
         ----------
         num_inputs: int
-            - 
+            - Number of inputs to the neuron
         w_0: array of size (num_inputs,)
             - Initial weights for the neuron
             - If None, randomly initializes the weights
@@ -80,8 +93,6 @@ class Neuron:
 
         # Formula: W*x + b (W is weights vector, b is bias)
         # Saves the output to the Neuron
-        print(self.w)
-        print('n', self.n)
         self.output = np.dot(self.w[:self.n], x) + self.w[-1]
 
         return self.activate(self.output) # Returns the output
@@ -259,10 +270,26 @@ class ConvolutionalLayer:
     def __init__(self, kernel_num, kernel_size, input_size, lr = 0.01, \
                     activation = 'logistic', w_0 = None):
         ''' 
+        Arguments:
+        ----------
+        kernel_num: int
+            - Numbers of kernels in layer
+        kernel_size: int
+            - Size of kernels in layer
         input_size: (channels, x, y) array-like 
-        
-        weights: (num_kernels, kernel_size, kernel_size)
+            - Size of input to layer
+            - Channels MUST come as first in array-like
+        lr: float, optional
+            - Default: 0.01
+            - Learning rate for all neurons in layer
+        activation: string, optional
+            - Default: 'logistic'
+            - Activation function for the layer
+            - Options: 'logistic', 'binary'
+        w_0: np array
+            - Must be of size (kernel_num, kernel_size, kernel_size)
 
+        No return
         '''
         self.kernel_num = kernel_num
         self.kernel_size = kernel_size
@@ -295,25 +322,32 @@ class ConvolutionalLayer:
                         activation = activation,
                         learning_rate = lr,
                         w_0 = self.w_0[i, :].flatten())
-                # Weights for each neuron: w1, w2, ..., w9, w1, w2, ..., w9
                 # Must have shared weights across kernels (i.e. using i)
                 # Each neuron has n*n*channels weights (input channels)
                 self.kernels[-1].append(new_neuron) # Add new neuron
-
         # self.kernels[i] refers to the ith kernel's neurons
 
     def calculate(self, x):
-        '''x has three dims - (channels, x_input, y_input)'''
+        '''
+        Calculate feedforward convolution for the layer
+        Arguments:
+        ----------
+        x: np array
+            - Must be of size self.input_size
+            - Has three dimensions - (channels, x_input, y_input)
+        
+        Returns:
+        --------
+        output: np array
+            - Complete output after all convolution operations on x
+        '''
         
         # Output of feedforward convolution:
         output = np.zeros(self.output_size) 
 
-        print('kernel num', self.kernel_num)
-
         for k in range(self.kernel_num): # Over kernels
             for i in range(self.output_size[1]): # Over rows
                 for j in range(self.output_size[2]): # Over cols
-                    
                     #top_left of input = (i, j)
                     
                     # Make the indices we need to iterate over
@@ -322,8 +356,6 @@ class ConvolutionalLayer:
                     # Extract input to neuron from x
                     # Concatenate all together and flatten for input
                     # Get input from each channel, put into same neuron
-                    print('x', x)
-                    print(x.shape)
                     neuron_input = np.array([x[channel][z][y] for z, y, channel in indices_to_get])
                         # Puts all input in a 1d array
 
@@ -333,51 +365,37 @@ class ConvolutionalLayer:
                     # j - goes over cols of each input matrix
                     output[k,i,j] = self.kernels[k][i + j].calculate(neuron_input)
 
-            #print('kernel', k)
-
-        #print('OUTPUT SIZE', output.shape)
         return output
 
     def calculatewdeltas(self, delta_w_matrix):
         '''
-        Two main tasks:
+        This function has two main tasks:
             1. Calculate w*delta matrix to pass to l-1 layer
             2. Perform weight updates for each neuron (thereby each weight in kernels)
 
         Arguments:
         ----------
-        delta_w_matrix: (output_size[0], output_size[1]) array
-            - Must be of this dimension for compatibility
-            - Only one channel - acts as if its repeated over multiple channels
+        delta_w_matrix: np array
+            - Must be size of output
+            - Calculated in l+1 layer
+            - If coming from Flatten layer, input should be transformed
+
+        Returns:
+        --------
+        dE_doutx: np array
+            - Will be of size input_size
+            - delta_w_matrix to be used in l-1 layer
         '''
 
         dE_doutx = np.zeros((self.input_channels, self.input_size[0], self.input_size[1]))
 
         # Performing convolutions to perform weight updates w/in each kernel
         for k in range(self.kernel_num): # Over kernels
-            # Setting up matrix of zeros for dE's wrt each w in kernel - calculated in Neuron class
-            #dE_dwi_matrix = np.zeros((self.kernel_size, self.kernel_size))
-
-            # dE_doutx should be same size as input to layer
-            # [0] is height, [1] is width
-            #dE_doutx = np.zeros((self.input_size[0], self.input_size[1]))
-            
-
             for i in range(self.output_size[1]): # Over rows
                 for j in range(self.output_size[2]): # Over cols
-                    # Make the indices we need to consider in dE_doutx
-                    # These indices correspond to our current neuron
-                    conv_inds = get_convolution_indices(i, j, self.input_channels, self.kernel_size)
-                        # i: top-left x value
-                        # j: top-left y values
-                        # self.input_channels: depth/num. channels in input
-                        # self.kernel_size: size of kernel
-
-                    # Get neuron's context (for a given kernel k) from delta_w matrix
-                    print(delta_w_matrix)
-                    print(delta_w_matrix.shape)
-                    #delta_w_ij = [delta_w_matrix[channel, x, y] for x, y, channel in conv_inds]
-                    delta_w_ij = [delta_w_matrix[k, i, j]]
+                    # Get error for this neuron from the delta_w_ij matrix
+                    #   Bulk of work is done in l+1 layer to calculate this value
+                    delta_w_ij = [delta_w_matrix[k, i, j]] # Wrap in list for compatibility in neuron
 
                     # Calculate the partial derivatives
                     current_delta_w = self.kernels[k][i + j].calcpartialderivative(delta_w_ij)
@@ -394,11 +412,6 @@ class ConvolutionalLayer:
                     
                     # Update the weights for the neuron we're currently on
                     self.kernels[k][i + j].updateweights()
-
-            #next_dw_mat.append(dE_doutx) # Append to list that will comprise dw matrix
-
-        #next_dw_mat = np.array(next_dw_mat)
-        #dE_doutx.shape == input_size
 
         return dE_doutx
 class MaxPoolingLayer:
@@ -523,18 +536,16 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
             self.loss = lambda y_hat, y: np.sum([-(yt[0]*np.log(yh) + (1-yt[0])*np.log(1-yh)) for yh, yt in zip(y_hat, y)])/len(y)
             self.loss_deriv = lambda y_hat, y: -(y/y_hat) + ((1-y)/(1-y_hat))
         elif loss == 'square':
-            #self.loss = lambda y_hat, y: 0.5 * np.sum(np.square(y_hat - y))
             self.loss = lambda y_hat, y: np.sum(np.square(y_hat - y))
             self.loss_deriv = lambda y_pred, y: 2 * (y_pred - y)
-            #self.loss_deriv = lambda y_pred, y: -(y-y_pred)
 
         #set up network
         self.network = []
 
     def addLayer(self, layer_type, num_neurons = 0, kernel_size = 3, num_kernels = 0, 
                     activation = 'logistic', weights = None):
-
         '''
+        Adds a layer to the NeuralNetwork object
         Arguments:
         ----------
         layer_type: string
@@ -557,6 +568,8 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
             - If None, weights are generated randomly
             - Weights must match dimensions specified by your given layer
             - If layer_type == 'Flatten' or 'Pool', this is ignored
+
+        No return value
         ''' 
 
         # Get input size from previous layer
@@ -606,16 +619,11 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         --------
         out: numpy array
             - output from network's ouptut layer
-        '''
-        #calculate first layer output based on input           
-        #out = self.network[0].calculate(input)
+        '''          
         out = input
-        # #number of hidden layers after first layer
+        # Number of hidden layers after first layer
         for i in range(0, len(self.network)):
-            print('**************layer num', i)
             out = self.network[i].calculate(out)
-            print('out', out)
-            print('out shape', out.shape)
 
         return out
 
@@ -683,193 +691,3 @@ class NeuralNetwork:    #initialize with the number of layers, number of neurons
         # Flow of delta*w's backwards through network
         for j in range(len(self.network) - 1, -1, -1):
             delt = self.network[j].calculatewdeltas(delt)
-
-def check_logical_predictions(y_hat, y):
-    '''
-    Checks if predictions made for logical problems are correct (and, xor)
-    Arguments:
-    ----------
-    y_hat: (n, ) numpy array
-        - Predicted
-    y: (n, ) numpy array
-        - Ground truth
-
-    Returns:
-    --------
-    result: bool
-        - True if y_hat == y
-        - False if y_hat != y
-    '''
-    for i in range(y_hat.shape[0]):
-        if (y[i] != y_hat[i]):
-            return False
-    return True
-
-def plot_one_loss_curve(losses, ep = None, title = 'Loss per Epochs'):
-    '''
-    Plots a singular loss curve over epochs
-    Arguments:
-    ----------
-    losses: (n, ) list
-        - Loss for network on each epoch
-        - n is number of epochs
-    ep: int, optional
-        - Default: None
-        - If None, doesn't plot the vertical line
-        - Epoch at which the network converged
-        - Will draw a vertical line at this point
-    title: string, optional
-        - Default: 'Loss per Epochs'
-        - Title for plot
-
-    No return value
-    '''
-    plt.plot(losses, c = 'g')
-    plt.xlabel('epochs')
-    plt.ylabel('loss')
-    plt.title(title)
-    if ep is not None:
-        plt.vlines(ep, ymax = max(losses), ymin = min(losses), label = 'Epoch of Correct Predictions')
-        plt.legend()
-
-    plt.grid()
-    plt.show()
-
-if __name__ == '__main__':
-
-    if len(sys.argv) < 2:
-        # Error checking for correct input
-        print('usage: python3 project1.py <option>')
-        print('\t Options: example, and, xor')
-        exit
-
-    elif sys.argv[1] == 'example':
-        w = np.array([[[.15,.2,.35],[.25,.3,.35]],[[.4,.45,.6],[.5,.55,.6]]])        
-        x = np.array([0.05,0.1])        
-        y = np.array([0.01,0.99])
-
-        # Neural network with 2 layers, 2 neurons per layer
-        nn = NeuralNetwork(2, [2, 2], 2, weights=w, lr=0.5, loss='square')
-        net_loss = []
-        nn.train(x, y)
-        print('Calculated Outputs (after 1 epoch) =', nn.calculate(x))
-        print("Weights in Network (please refer to in-class example for each weight's label):")
-
-        print('Weight \t Value')
-        # Iterate over neuron h1, h2:
-        count = 1
-        bcount = 1
-        for i in [0, 1]:
-            for j in [0, 1]:
-                print('w{} \t {}'.format(count, nn.network[i].neurons[j].w[0]))
-                print('w{} \t {}'.format(count + 1, nn.network[i].neurons[j].w[1]))
-                print('b{} \t {}'.format(bcount, nn.network[i].neurons[j].w[2]))
-                bcount += 1
-                count += 2
-
-        print('Loss (MSE) after 1 Epoch =', nn.calculateloss(nn.calculate(x), y))
-
-
-    elif sys.argv[1] == 'and':
-        # Initializing with random weights
-        x = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-        y = np.array([[0], [0], [0], [1]]) # Must wrap each label in a list (for generality)
-        nn = NeuralNetwork(1, [1], 2, lr = 0.1, loss = 'binary')
-
-        net_loss = []
-        first = True
-        for i in range(0, 100): #100 is maximum
-            for j in range(0, len(x)):
-                nn.train(x[j], y[j])
-
-            y_hat = [nn.calculate(xi) for xi in x]
-            #for j in range(0, len(x)):
-            #    y_hat.append(nn.calculate(x[j]))
-                
-            net_loss.append(nn.calculateloss(np.array(y_hat), y))
-
-            # Classify the predictions based on definition of sigmoid
-            y_hat_preds = np.array([0 if yh < 0.5 else 1 for yh in y_hat])
-
-            # Stop epochs early if predictions are correct:
-            if (check_logical_predictions(y_hat_preds, [0, 0, 0, 1]) and first):
-                first = False
-                ep = i
-
-        # Printing the final predictions:
-        print('Running AND Logic Data (1 Perceptron Network)')
-        print('Input \t Prediction \t Ground Truth')
-        for i in range(len(y_hat)):
-            print('{} \t {:.6f} \t {}'.format(x[i], y_hat[i][0], y[i][0]))
-        print('Epoch of Convergence', ep)
-        print('Final Loss (Binary Cross Entropy) =', net_loss[-1])
-
-        # Plot the loss curve
-        plot_one_loss_curve(net_loss, ep = ep, title = 'Loss per Epoch (AND)')
-
-    elif sys.argv[1] == 'xor':
-        x = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-        y = np.array([[0], [1], [1], [0]])
-
-        # Neural net with 1 perceptron
-        nn = NeuralNetwork(1, [1], 2, lr = 0.5, loss = 'binary')
-
-        net_loss = []
-
-        # Run for 100 epochs
-        for i in range(0, 10000):
-            for j in range(0, len(x)):
-                nn.train(x[j], y[j])
-
-            y_hat = [nn.calculate(xi) for xi in x]
-                
-            net_loss.append(nn.calculateloss(np.array(y_hat), y))
-
-            # Classify the predictions based on definition of sigmoid
-            y_hat_preds = np.array([0 if yh < 0.5 else 1 for yh in y_hat])
-
-        # Printing the final predictions:
-        print('Running XOR Logic Data (Single Perceptron)')
-        print('Input \t Prediction \t Ground Truth')
-        for i in range(len(y_hat)):
-            print('{} \t {:.6f} \t {}'.format(x[i], y_hat[i][0], y[i][0]))
-        print('Final Loss (Binary Cross Entropy) =', net_loss[-1])
-        print('')
-
-        plot_one_loss_curve(net_loss, title = 'Single Perceptron Loss vs. Epoch (XOR)')
-
-        # ---------------------------
-        # Neural net with 2 layers
-        nn = NeuralNetwork(2, [2, 1], 2, lr = 1, loss = 'binary')
-
-        net_loss = []
-        first = True
-
-        # Run for 100 epochs
-        for i in range(0, 10000):
-            for j in range(0, len(x)):
-                nn.train(x[j], y[j])
-
-            y_hat = [nn.calculate(xi) for xi in x]
-                
-            net_loss.append(nn.calculateloss(np.array(y_hat), y))
-
-            # Classify the predictions based on definition of sigmoid
-            y_hat_preds = np.array([0 if yh < 0.5 else 1 for yh in y_hat])
-
-            # Stop epochs early if predictions are correct:
-            if (check_logical_predictions(y_hat_preds, [0, 1, 1, 0]) and first):
-                first = False
-                ep = i
-
-        # Printing the final predictions:
-        print('Running XOR Logic Data (Network with 1 Hidden Layer)')
-        print('Input \t Prediction \t Ground Truth')
-        for i in range(len(y_hat)):
-            print('{} \t {:.6f} \t {}'.format(x[i], y_hat[i][0], y[i][0]))
-        print('Epoch of Convergence', ep)
-        print('Final Loss (Binary Cross Entropy) =', net_loss[-1])
-        print('')
-
-        # Plot the loss curve
-        plot_one_loss_curve(net_loss, ep = ep, title = '1 Hidden Layer Loss vs. Epoch (XOR)')
