@@ -304,10 +304,6 @@ class ConvolutionalLayer:
 
     def calculate(self, x):
         '''x has three dims - (channels, x_input, y_input)'''
-
-        #np[channel]
-
-        #.reshape()
         
         # Output of feedforward convolution:
         output = np.zeros(self.output_size) 
@@ -321,7 +317,6 @@ class ConvolutionalLayer:
                     #top_left of input = (i, j)
                     
                     # Make the indices we need to iterate over
-                    #print('input channels', self.input_channels)
                     indices_to_get = get_convolution_indices(i, j, self.input_channels, self.kernel_size)
 
                     # Extract input to neuron from x
@@ -332,19 +327,15 @@ class ConvolutionalLayer:
                     neuron_input = np.array([x[channel][z][y] for z, y, channel in indices_to_get])
                         # Puts all input in a 1d array
 
-                    #for channel in range(self.input_channels):
-                        
-                        #neuron_input += [x[channel][ind[0]][ind[1]] for ind in indices_to_get]
-
                     # Save calculation of neuron to output matrix
                     # k - goes over kernels
                     # i - goes over rows of each input matrix
                     # j - goes over cols of each input matrix
                     output[k,i,j] = self.kernels[k][i + j].calculate(neuron_input)
 
-            print('kernel', k)
+            #print('kernel', k)
 
-        print('OUTPUT SIZE', output.shape)
+        #print('OUTPUT SIZE', output.shape)
         return output
 
     def calculatewdeltas(self, delta_w_matrix):
@@ -359,12 +350,6 @@ class ConvolutionalLayer:
             - Must be of this dimension for compatibility
             - Only one channel - acts as if its repeated over multiple channels
         '''
-
-        # Reshaping delta_w if needed:
-        # IRRELEVANT -------------------
-        #delta_w_matrix = delta_w_matrix.reshape((delta_w_matrix.shape[0], 1, delta_w_matrix.shape[1]))
-
-        next_dw_mat = []
 
         dE_doutx = np.zeros((self.input_channels, self.input_size[0], self.input_size[1]))
 
@@ -406,20 +391,9 @@ class ConvolutionalLayer:
                     #   Note that the tensor is the same size as input
                     # Must do this over EVERY CHANNEL (i.e. : in first spot)
                     dE_doutx[:, i:(i + self.kernel_size), j:(j + self.kernel_size)] += current_delta_w
-
-                    # Need to pass convolved version of delta_w matrix backwards:
-
-                    # Also pass delta_w from l+1 portion backwards
-                    #current_delta_w = self.kernel[k][i + j].calcpartialderivative(delta_w_matrix[k, :,(i + j)])
                     
                     # Update the weights for the neuron we're currently on
                     self.kernels[k][i + j].updateweights()
-
-                    # Add current_delta_w to appropriate location (conv_inds) in dE_doutx
-                    #for i in len(current_delta_w):
-                    #    ci, cj = conv_inds[i]
-                        #dE_doutx[ci, cj] += current_delta_w
-                        #dE_doutx[ci + cj] += current_delta_w
 
             #next_dw_mat.append(dE_doutx) # Append to list that will comprise dw matrix
 
@@ -492,7 +466,6 @@ class FlattenLayer:
         return np.reshape(input, self.i_s)
 
 class NeuralNetwork:    #initialize with the number of layers, number of neurons in each layer (vector), input size, activation (for each layer), the loss function, the learning rate and a 3d matrix of weights weights (or else initialize randomly)    
-    #def __init__(self,numOfLayers,numOfNeurons, inputSize, activation='logistic', loss='square', lr=.001, weights=None):
     def __init__(self, inputSize, loss='square', lr=.001):
         '''
         Initializes the Neural Network
