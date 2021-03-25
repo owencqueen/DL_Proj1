@@ -7,6 +7,9 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import confusion_matrix
+
+import seaborn as sns
 
 import matplotlib.pyplot as plt
 
@@ -14,7 +17,21 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 def load_data():
-    '''Loads data from the given directories'''
+    '''
+    Loads data from the given directories
+        - Performs min-max scaling
+    No arguments
+    Returns:
+    --------
+    train, train_labels, val, val_labels
+    train: list of (32, 32, 1) np arrays
+        - All loaded pictures
+        - Preserves sequence observed in each labels file
+    train_labels: pd Dataframe
+        - CSV-loaded file with labels
+    val: same as train but for validation set
+    val_labels: same as train_labels but for validation set
+    '''
     train_labels = pd.read_csv('fairface_label_train.csv')
     val_labels = pd.read_csv('fairface_label_val.csv')
 
@@ -55,7 +72,21 @@ def load_data():
     return np.array(train), train_labels, np.array(val), val_labels
 
 def to_numeric(pd_series):
-    '''Converts series of labels into numeric with mapping'''
+    '''
+    Converts series of labels into numeric with mapping
+    
+    Arguments:
+    ----------
+    pd_series: Pandas series or any array-lik
+        - Series of labels to turn numeric
+
+    Returns:
+    --------
+    numeric_labels: list
+        - Labels in numeric form
+    mapping: dictionary
+        - Provides a mapping from values in numeric_labels to original label
+    '''
     le = LabelEncoder()
     le.fit(pd_series)
 
@@ -67,22 +98,52 @@ def to_numeric(pd_series):
 
     return numeric_labels, mapping
 
+def plot_cm(model, Xval, Yval, val_map, title):
+    '''Plot a confusion matrix'''
+    preds = model.predict(Xval)
+
+    # Sigmoid decision rule:
+    ypred = [1 if p > 0.5 else 0 for p in preds]
+
+    cm = confusion_matrix(Yval, ypred)
+    df_cm = pd.DataFrame(cm/np.sum(cm), index = [val_map[i] for i in range(len(set(Yval)))], 
+                columns = [val_map[i] for i in range(len(set(Yval)))])
+
+    #plt.figure(fig_size = (10, 7))
+    sns.heatmap(df_cm, annot=True, fmt = '.2%')
+    plt.title(title)
+    plt.show()
 
 def train_model(model, args, label = 'gender'):
-    '''Runs task 1, 2, or 3 from writeup
-    Note: this function does not perform advanced preprocessing other than loading data'''
+    '''
+    Runs task 1, 2, or 3 from writeup
+    Note: this function does not perform advanced preprocessing other than loading data
+    Generates two plots:
+        1) Plot of validation and training accuracy
+        2) Confusion matrix (not tested for >2 classes)
+
+    Arguments:
+    ----------
+    model: keras model instance
+        - Built model (not trained)
+    args: dictionary
+        - Should contain values with keys:
+        'optimizer', 'loss', 'epochs', 'batch_size', 'task_number'
+    label: string, optional
+        - Default: 'gender'
+        - Label you're trying to predict
+
+    Returns:
+    --------
+    No return value
+
+    '''
 
     Xtrain, train_labels, Xval, val_labels = load_data()
 
-    #Xtrain = np.reshape(Xtrain, (Xtrain.shape[0], 32, 32, 1))
-
+    # Create mappings for Y values
     Ytrain, train_map = to_numeric(train_labels[label])
-    #print(Ytrain.shape)
-    #print(Xtrain.shape)
-    
     Yval, val_map = to_numeric(val_labels[label])
-    #print('y val', Yval.shape)
-    #print(Xval.shape)
 
     num_classes = train_labels[label].value_counts().shape[0]
 
@@ -97,11 +158,7 @@ def train_model(model, args, label = 'gender'):
         loss = args['loss'], metrics = ['accuracy']
     )
 
-    #print('Xtrain', Xtrain)
-    #print(Xtrain)
-    #print('Y', Ytrain)
-    #print(args.items())
-
+    # Fit the model
     history = model.fit(
         Xtrain, Ytrain, 
         validation_data = (Xval, Yval),
@@ -109,13 +166,16 @@ def train_model(model, args, label = 'gender'):
         batch_size = args['batch_size']
     )
 
-    plt.plot(history.history['loss'], label = 'Training')
-    plt.plot(history.history['val_loss'], label = 'Validation')
-    plt.title('Training Accuracy')
+    # Plot
+    plt.plot(history.history['accuracy'], label = 'Training')
+    plt.plot(history.history['val_accuracy'], label = 'Validation')
+    plt.title('Task {} Training and Validation Accuracy'.format(args['task_number']))
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.legend()
     plt.show()
+
+    plot_cm(model, Xval, Yval, val_map, title = 'Task {} Validation Confusion Matrix'.format(args['task_number']))
 
 def evoke_task(task_number = 'task1', label = 'gender'):
 
@@ -139,9 +199,10 @@ def evoke_task(task_number = 'task1', label = 'gender'):
 
         args = {
             'loss': l,
-            'optimizer': 'sgd',#tf.keras.optimizers.Adam(learning_rate = 0.1),
-            'epochs': 3,
-            'batch_size': 128
+            'optimizer': tf.keras.optimizers.SGD(learning_rate = 0.1),
+            'epochs': 13,
+            'batch_size': 128,
+            'task_number': 2
         }
 
         train_model(model, args, label)
