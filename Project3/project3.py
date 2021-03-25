@@ -99,11 +99,26 @@ def to_numeric(pd_series):
     return numeric_labels, mapping
 
 def plot_cm(model, Xval, Yval, val_map, title):
-    '''Plot a confusion matrix'''
+    '''
+    Plot a confusion matrix for the given validation data
+
+    Arguments:
+    ----------
+    model: keras.Model() object
+        - Model that we're evaluating
+
+    Returns:
+    --------
+    '''
     preds = model.predict(Xval)
 
+    num_classes = len(set(Yval))
+
     # Sigmoid decision rule:
-    ypred = [1 if p > 0.5 else 0 for p in preds]
+    if num_classes == 2:
+        ypred = [1 if p > 0.5 else 0 for p in preds]
+    else:
+        ypred = [np.argmax(p) for p in preds]
 
     cm = confusion_matrix(Yval, ypred)
     df_cm = pd.DataFrame(cm/np.sum(cm), index = [val_map[i] for i in range(len(set(Yval)))], 
@@ -175,9 +190,19 @@ def train_model(model, args, label = 'gender'):
     plt.legend()
     plt.show()
 
-    plot_cm(model, Xval, Yval, val_map, title = 'Task {} Validation Confusion Matrix'.format(args['task_number']))
+    plot_cm(model, Xval, Yval, val_map, title = 'Task {}, Label = {} Validation Confusion Matrix'.format(args['task_number'], label))
 
 def evoke_task(task_number = 'task1', label = 'gender'):
+    '''
+    Evokes the given task number from the command line
+        - Parsing done in if main statement
+    
+    Arguments:
+    ----------
+
+    Returns:
+    --------
+    '''
 
     if task_number == 'task1':
         pass
@@ -186,8 +211,10 @@ def evoke_task(task_number = 'task1', label = 'gender'):
 
         if label == 'gender':
             l = 'binary_crossentropy'
-        else:
-            l = tf.keras.losses.CategoricalCrossentropy()
+            eps = 13
+        elif label == 'age':
+            l = tf.keras.losses.SparseCategoricalCrossentropy()
+            eps = 11
 
         # Note: default is strides=1
         model = tf.keras.Sequential()
@@ -200,7 +227,7 @@ def evoke_task(task_number = 'task1', label = 'gender'):
         args = {
             'loss': l,
             'optimizer': tf.keras.optimizers.SGD(learning_rate = 0.1),
-            'epochs': 13,
+            'epochs': eps,
             'batch_size': 128,
             'task_number': 2
         }
@@ -208,6 +235,6 @@ def evoke_task(task_number = 'task1', label = 'gender'):
         train_model(model, args, label)
 
 if __name__ == '__main__':
-    evoke_task('task2', 'gender')
+    evoke_task('task2', 'age')
     #a,b,c,d = load_data()
     #to_numeric(d['gender'])    
