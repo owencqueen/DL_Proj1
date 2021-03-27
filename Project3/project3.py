@@ -205,7 +205,31 @@ def evoke_task(task_number = 'task1', label = 'gender'):
     '''
 
     if task_number == 'task1':
-        pass
+
+        if label == 'gender':
+            l = 'binary_crossentropy'
+            eps = 13
+        elif label == 'age':
+            l = tf.keras.losses.SparseCategoricalCrossentropy()
+            eps = 11
+        elif label == 'race':
+            l = tf.keras.losses.SparseCategoricalCrossentropy()
+            eps = 11
+        
+        model = tf.keras.Sequential()
+        model.add(keras.Input(shape=(32,32, 1)))
+        model.add(layers.Flatten())
+        model.add(layers.Dense(1024, activation='tanh'))
+        model.add(layers.Dense(512, activation='sigmoid'))
+        model.add(layers.Dense(100, activation='relu'))
+
+        args = {
+            'loss': l,
+            'optimizer': tf.keras.optimizers.SGD(learning_rate = 0.1),
+            'epochs': eps,
+            'batch_size': 128,
+            'task_number': 1
+        }
 
     if task_number == 'task2':
 
@@ -232,7 +256,128 @@ def evoke_task(task_number = 'task1', label = 'gender'):
             'task_number': 2
         }
 
-        train_model(model, args, label)
+    if task_number == 'task3':
+
+        if label == 'gender':
+            l = 'binary_crossentropy'
+            eps = 13
+        elif label == 'age':
+            l = tf.keras.losses.SparseCategoricalCrossentropy()
+            eps = 11
+        elif label == 'race':
+            l = tf.keras.losses.SparseCategoricalCrossentropy()
+            eps = 11
+        
+        model = tf.keras.Sequential()
+        model.add(layers.Conv2D(filters=40, kernel_size=3, activation = 'relu', strides=1, input_shape = (32, 32, 1), padding = 'valid'))
+        model.add(layers.Conv2D(filters=80, kernel_size=5, activation = 'relu', strides=1, padding = 'valid'))
+        model.add(layers.MaxPooling2D(2))
+        model.add(layers.Flatten())
+        model.add(layers.Dense(1000, activation = 'relu'))
+
+        args = {
+            'loss': l,
+            'optimizer': tf.keras.optimizers.SGD(learning_rate = 0.1),
+            'epochs': eps,
+            'batch_size': 128,
+            'task_number': 3
+        }
+
+    train_model(model, args, label)
+
+def task4(label = ['gender', 'age']):
+    '''
+    Runs task 4
+    Note: this function does not perform advanced preprocessing other than loading data
+    Generates two plots:
+        1) Plot of validation and training accuracy
+        2) Confusion matrix (not tested for >2 classes)
+
+    Arguments:
+    ----------
+    model: keras model instance
+        - Built model (not trained)
+    args: dictionary
+        - Should contain values with keys:
+        'optimizer', 'loss', 'epochs', 'batch_size', 'task_number'
+    label: string, optional
+        - Default: 'gender'
+        - Label you're trying to predict
+
+    Returns:
+    --------
+    No return value
+
+    '''
+
+    Xtrain, train_labels, Xval, val_labels = load_data()
+
+    l = []
+    Ytrain = []
+    Yval = []
+    num_classes = []
+    val_map = []
+    for i in label:
+        tr_dat, tr_map = to_numeric(train_labels[i])
+        Ytrain.append(tr_dat)
+        val_dat, val_m = to_numeric(val_labels[i])
+        val_map.append(val_m)
+        num_classes.append(train_labels[i].value_counts().shape[0])
+        Yval.append(val_dat)
+        if i == 'gender':
+            l.append('binary_crossentropy')
+        elif i == 'age':
+            l.append(tf.keras.losses.SparseCategoricalCrossentropy())
+        elif i == 'race':
+            l.append(tf.keras.losses.SparseCategoricalCrossentropy())
+    
+    eps = 30
+    
+    image_input = tf.keras.Input(shape=(32,32,1))
+    h1 = layers.Conv2D(filters=40, kernel_size=3, activation = 'relu', strides=1, padding = 'valid')(image_input)
+    h2 = layers.Conv2D(filters=80, kernel_size=5, activation = 'relu', strides=1, padding = 'valid')(h1)
+    flatten = layers.Flatten()(h2)
+    last_hidden = layers.Dense(1000, activation='relu')(flatten)
+
+    output_layers = []
+    for i in range(len(label)):
+        if label[i] == 'gender':
+            output_layers.append(layers.Dense(num_classes[i], name='gender')(last_hidden))
+        elif label[i] == 'age':
+            output_layers.append(layers.Dense(num_classes[i], name='age')(last_hidden))
+        elif label[i] == 'race':
+            output_layers.append(layers.Dense(num_classes[i], name='race')(last_hidden))
+
+
+    model = keras.Model(inputs=image_input, outputs=output_layers)
+
+    keras.utils.plot_model(model, "task4.png", show_shapes=True)
+
+    # Using adam for all tasks
+    model.compile(
+        optimizer = tf.keras.optimizers.SGD(learning_rate = 0.1), 
+        loss = l
+    )
+
+    # Fit the model
+    history = model.fit(
+        Xtrain, Ytrain, 
+        validation_data = (Xval, Yval),
+        epochs = eps,
+        batch_size = 128
+    )
+
+    # Plot
+    plt.plot(history.history['accuracy'], label = 'Training')
+    plt.plot(history.history['val_accuracy'], label = 'Validation')
+    plt.title('Task {} Training and Validation Accuracy'.format(4))
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.show()
+
+    for i in range(len(label)):
+        plot_cm(model, Xval, Yval[i], val_map[i], title = 'Task {}, Label = {} Validation Confusion Matrix'.format(4, label[i]))
 
 if __name__ == '__main__':
     evoke_task('task2', 'age')
