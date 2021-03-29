@@ -123,7 +123,7 @@ def plot_cm(model, Xval, Yval, val_map, title):
     df_cm = pd.DataFrame(cm/np.sum(cm), index = [val_map[i] for i in range(len(set(Yval)))], 
                 columns = [val_map[i] for i in range(len(set(Yval)))])
 
-    #plt.figure(fig_size = (10, 7))
+    plt.figure(figsize = (10, 7))
     sns.heatmap(df_cm, annot=True, fmt = '.2%')
     plt.title(title)
     plt.show()
@@ -171,6 +171,10 @@ def train_model(model, args, label = 'gender'):
         loss = args['loss'], metrics = ['accuracy']
     )
 
+    print(model.summary())
+
+    keras.utils.plot_model(model, str(args['task_number'])+'_'+label+'.png', show_shapes=True)
+
     # Fit the model
     history = model.fit(
         Xtrain, Ytrain, 
@@ -188,13 +192,11 @@ def train_model(model, args, label = 'gender'):
     plt.legend()
     plt.show()
 
-    plot_cm(model, Xval, Yval, val_map, title = 'Task {}, Label = {} Validation Confusion Matrix'.format(args['task_number'], label))
+    plot_cm(model, Xval, Yval, val_map, title = 'Task {}, {} Validation Confusion Matrix'.format(args['task_number'], label))
 
 def evoke_task(task_number = 'task1', label = 'gender'):
-    '''
-    Evokes the given task number from the command line
+    """Evokes the given task number from the command line
         - Parsing done in if main statement
-    
     Arguments:
     ----------
     task_number: string, optional
@@ -214,13 +216,13 @@ def evoke_task(task_number = 'task1', label = 'gender'):
 
         if label == 'gender':
             l = 'binary_crossentropy'
-            eps = 13
+            eps = 50
         elif label == 'age':
             l = tf.keras.losses.SparseCategoricalCrossentropy()
-            eps = 11
+            eps = 50
         elif label == 'race':
             l = tf.keras.losses.SparseCategoricalCrossentropy()
-            eps = 11
+            eps = 50
         
         model = tf.keras.Sequential()
         model.add(keras.Input(shape=(32,32, 1)))
@@ -266,25 +268,42 @@ def evoke_task(task_number = 'task1', label = 'gender'):
 
         if label == 'gender':
             l = 'binary_crossentropy'
-            eps = 13
+            eps = 50
+            lr = 0.01
         elif label == 'age':
             l = tf.keras.losses.SparseCategoricalCrossentropy()
-            eps = 11
+            eps = 50
+            lr = 0.1
         elif label == 'race':
             l = tf.keras.losses.SparseCategoricalCrossentropy()
-            eps = 11
+            eps = 50
+            lr = 0.01
         
         model = tf.keras.Sequential()
-        model.add(layers.Conv2D(filters=40, kernel_size=3, activation = 'relu', strides=1, input_shape = (32, 32, 1), padding = 'valid'))
-        model.add(layers.Conv2D(filters=80, kernel_size=5, activation = 'relu', strides=1, padding = 'valid'))
+        model.add(layers.Conv2D(filters=64, kernel_size=3, activation = 'relu', strides=1, input_shape = (32, 32, 1), padding = 'same'))
+        model.add(layers.Conv2D(filters=64, kernel_size=3, activation = 'relu', strides=1, padding = 'same'))
+        model.add(layers.Conv2D(filters=64, kernel_size=3, activation = 'relu', strides=1, padding = 'same'))
         model.add(layers.MaxPooling2D(2))
+        #model.add(layers.Dropout(rate=0.5))
+        model.add(layers.Conv2D(filters=128, kernel_size=3, activation = 'relu', strides=1, padding = 'same'))
+        model.add(layers.Conv2D(filters=128, kernel_size=3, activation = 'relu', strides=1, padding = 'same'))
+        model.add(layers.Conv2D(filters=128, kernel_size=3, activation = 'relu', strides=1, padding = 'same'))
+        model.add(layers.MaxPooling2D(2))
+        model.add(layers.Dropout(rate=0.5))
+        model.add(layers.Conv2D(filters=256, kernel_size=2, activation = 'relu', strides=1, padding = 'same'))
+        model.add(layers.Conv2D(filters=256, kernel_size=2, activation = 'relu', strides=1, padding = 'same'))
+        model.add(layers.Conv2D(filters=256, kernel_size=2, activation = 'relu', strides=1, padding = 'same'))
+        model.add(layers.MaxPooling2D(2))
+        #model.add(layers.Dropout(rate=0.5))
         model.add(layers.Flatten())
-        model.add(layers.Dense(1000, activation = 'relu'))
+        model.add(layers.Dense(4096, activation = 'relu'))
+        model.add(layers.Dense(1024, activation = 'relu'))
+        model.add(layers.Dense(1024, activation = 'relu'))
 
         args = {
             'loss': l,
-            'optimizer': tf.keras.optimizers.SGD(learning_rate = 0.1),
-            'epochs': eps,
+            'optimizer': tf.keras.optimizers.SGD(learning_rate = lr),
+            'epochs': 50,
             'batch_size': 128,
             'task_number': 3
         }
@@ -302,7 +321,7 @@ def evoke_task(task_number = 'task1', label = 'gender'):
 
     train_model(model, args, label)
 
-def task4(label = ['gender', 'age']):
+def task4(label=['gender','age']):
     '''
     Runs task 4
     Note: this function does not perform advanced preprocessing other than loading data
@@ -312,14 +331,9 @@ def task4(label = ['gender', 'age']):
 
     Arguments:
     ----------
-    model: keras model instance
-        - Built model (not trained)
-    args: dictionary
-        - Should contain values with keys:
-        'optimizer', 'loss', 'epochs', 'batch_size', 'task_number'
-    label: string, optional
-        - Default: 'gender'
-        - Label you're trying to predict
+    label: list
+        - Default: ['gender', 'age']
+        - Labels you're trying to predict
 
     Returns:
     --------
@@ -330,6 +344,7 @@ def task4(label = ['gender', 'age']):
     Xtrain, train_labels, Xval, val_labels = load_data()
 
     l = []
+    l_wts = []
     Ytrain = []
     Yval = []
     num_classes = []
@@ -343,37 +358,66 @@ def task4(label = ['gender', 'age']):
         Yval.append(val_dat)
         if i == 'gender':
             l.append('binary_crossentropy')
+            l_wts.append(0.1)
         elif i == 'age':
             l.append(tf.keras.losses.SparseCategoricalCrossentropy())
+            l_wts.append(4.0)
         elif i == 'race':
             l.append(tf.keras.losses.SparseCategoricalCrossentropy())
+            l_wts.append(1.0)
     
-    eps = 30
+    eps = 50
     
     image_input = tf.keras.Input(shape=(32,32,1))
-    h1 = layers.Conv2D(filters=40, kernel_size=3, activation = 'relu', strides=1, padding = 'valid')(image_input)
-    h2 = layers.Conv2D(filters=80, kernel_size=5, activation = 'relu', strides=1, padding = 'valid')(h1)
-    flatten = layers.Flatten()(h2)
-    last_hidden = layers.Dense(1000, activation='relu')(flatten)
+    c1 = layers.Conv2D(filters=64, kernel_size=3, activation = 'relu', strides=1, padding = 'same')(image_input)
+    c2 = layers.Conv2D(filters=64, kernel_size=3, activation = 'relu', strides=1, padding = 'same')(c1)
+    c3 = layers.Conv2D(filters=64, kernel_size=3, activation = 'relu', strides=1, padding = 'same')(c2)
+    bn1 = layers.BatchNormalization()(c3)
+    m1 = layers.MaxPooling2D(2)(bn1)
+    d1 = layers.Dropout(rate=0.25)(m1)
+    c4 = layers.Conv2D(filters=128, kernel_size=3, activation = 'relu', strides=1, padding = 'same')(d1)
+    c5 = layers.Conv2D(filters=128, kernel_size=3, activation = 'relu', strides=1, padding = 'same')(c4)
+    c6 = layers.Conv2D(filters=128, kernel_size=3, activation = 'relu', strides=1, padding = 'same')(c5)
+    bn2 = layers.BatchNormalization()(c6)
+    m2 = layers.MaxPooling2D(2)(bn2)
+    d2 = layers.Dropout(rate=0.25)(m2)
+    c7 = layers.Conv2D(filters=256, kernel_size=2, activation = 'relu', strides=1, padding = 'same')(d2)
+    c8 = layers.Conv2D(filters=256, kernel_size=2, activation = 'relu', strides=1, padding = 'same')(c7)
+    c9 = layers.Conv2D(filters=256, kernel_size=2, activation = 'relu', strides=1, padding = 'same')(c8)
+    m3 = layers.MaxPooling2D(2)(c9)
+    d3 = layers.Dropout(rate=0.25)(m3)
+    flatten = layers.Flatten()(d3)
 
     output_layers = []
     for i in range(len(label)):
         if label[i] == 'gender':
-            output_layers.append(layers.Dense(num_classes[i], name='gender')(last_hidden))
+          g1 = layers.Dense(4096, activation='relu')(flatten)
+          g2 = layers.Dense(2048, activation='relu')(g1)
+          
+          output_layers.append(layers.Dense(num_classes[i]-1, name='gender', activation='sigmoid')(g2))
         elif label[i] == 'age':
-            output_layers.append(layers.Dense(num_classes[i], name='age')(last_hidden))
+          a1 = layers.Dense(4096, activation='relu')(flatten)
+          a2 = layers.Dense(2048, activation='relu')(a1)
+          
+          output_layers.append(layers.Dense(num_classes[i], name='age', activation='softmax')(a2))
         elif label[i] == 'race':
-            output_layers.append(layers.Dense(num_classes[i], name='race')(last_hidden))
+          r1 = layers.Dense(4096, activation='relu')(flatten)
+          r2 = layers.Dense(2048, activation='relu')(r1)
+          output_layers.append(layers.Dense(num_classes[i], name='race', activation='softmax')(r2))
 
 
     model = keras.Model(inputs=image_input, outputs=output_layers)
+
+    print(model.summary())
 
     keras.utils.plot_model(model, "task4.png", show_shapes=True)
 
     # Using adam for all tasks
     model.compile(
-        optimizer = tf.keras.optimizers.SGD(learning_rate = 0.1), 
-        loss = l
+        optimizer = tf.keras.optimizers.SGD(learning_rate = 0.01),#, decay=0.1/eps), 
+        loss = l,
+        metrics=["accuracy"],
+        #loss_weights = l_wts
     )
 
     # Fit the model
@@ -384,17 +428,38 @@ def task4(label = ['gender', 'age']):
         batch_size = 128
     )
 
-    # Plot
-    plt.plot(history.history['accuracy'], label = 'Training')
-    plt.plot(history.history['val_accuracy'], label = 'Validation')
-    plt.title('Task {} Training and Validation Accuracy'.format(4))
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.legend()
+    (fig, ax) = plt.subplots(len(label), 1, figsize=(8, 8))
+    fig.subplots_adjust(hspace=0.5)
+    for (i, l) in enumerate(label):
+      # plot the loss for both the training and validation data
+      ax[i].set_title("Accuracy for {}".format(l))
+      ax[i].set_xlabel("Epoch #")
+      ax[i].set_ylabel("Accuracy")
+      ax[i].plot(np.arange(0, eps), history.history[l+'_accuracy'], label='Training')
+      ax[i].plot(np.arange(0, eps), history.history["val_" + l+'_accuracy'],
+        label='Validation')
+      ax[i].legend()
     plt.show()
 
+    preds = model.predict(Xval)
     for i in range(len(label)):
-        plot_cm(model, Xval, Yval[i], val_map[i], title = 'Task {}, Label = {} Validation Confusion Matrix'.format(4, label[i]))
+
+      num_classes = len(set(Yval[i]))
+
+      # Sigmoid decision rule:
+      if num_classes == 2:
+          ypred = [1 if p > 0.5 else 0 for p in preds[i]]
+      else:
+          ypred = [np.argmax(p) for p in preds[i]]
+
+      cm = confusion_matrix(Yval[i], ypred)
+      df_cm = pd.DataFrame(cm/np.sum(cm), index = [val_map[i][j] for j in range(len(set(Yval[i])))], 
+                  columns = [val_map[i][j] for j in range(len(set(Yval[i])))])
+
+      plt.figure(figsize = (10, 7))
+      sns.heatmap(df_cm, annot=True, fmt = '.2%')
+      plt.title('Task {}, {} Validation Confusion Matrix'.format(4, label[i]))
+      plt.show()
 
 if __name__ == '__main__':
     options = set(['task' + str(i) for i in range(1, 6)])
@@ -421,4 +486,4 @@ if __name__ == '__main__':
     else:
         next_arg = None
 
-    evoke_task(sys.argv[1], next_arg)   
+    evoke_task(sys.argv[1], next_arg)
