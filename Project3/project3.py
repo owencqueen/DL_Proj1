@@ -1,4 +1,4 @@
-import os, random
+import os, random, sys
 import numpy as np
 import pandas as pd
 import tensorflow as tf # Getting Tensorflow
@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 # Using Python Image Library (PIL) for image processing
 from PIL import Image
 
-# Import from other script for task5
-from vae import run_vae
+# Import other module for task5
+import vae
 
 def load_data():
     '''
@@ -165,8 +165,6 @@ def train_model(model, args, label = 'gender'):
     else:
         model.add(layers.Dense(num_classes, activation = 'softmax'))
 
-    print(model.summary())
-
     # Using adam for all tasks
     model.compile(
         optimizer = args['optimizer'], 
@@ -299,7 +297,7 @@ def evoke_task(task_number = 'task1', label = 'gender'):
         'batch_size': 128,
         'epochs':10  
         }
-        run_vae('gender', args, save = False)
+        vae.run_vae('gender', args, save = False)
 
     train_model(model, args, label)
 
@@ -398,6 +396,17 @@ def task4(label = ['gender', 'age']):
         plot_cm(model, Xval, Yval[i], val_map[i], title = 'Task {}, Label = {} Validation Confusion Matrix'.format(4, label[i]))
 
 if __name__ == '__main__':
-    evoke_task('task2', 'gender')
-    #a,b,c,d = load_data()
-    #to_numeric(d['gender'])    
+    options = set(['task' + str(i) for i in range(1, 6)])
+    label_options = set(['gender', 'age'])
+
+    # Command line interface:
+    if (str(sys.argv[1]) not in options):
+        print('usage: python3 project3.py task<1-5> <gender or task>')
+        exit()
+    
+    elif (str(sys.argv[2]) not in label_options) and str(sys.argv[1] != 'task5'):
+        print('usage: python3 project3.py task<1-5> <gender or task>')
+        exit()
+
+    else:
+        evoke_task(sys.argv[1], sys.argv[2])   

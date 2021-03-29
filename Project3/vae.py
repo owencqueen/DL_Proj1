@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras import backend
 
-from project3 import load_data, to_numeric
+import project3
 
 import matplotlib.pyplot as plt
 
@@ -92,9 +92,7 @@ def build_model(args):
     # Full encoder model:
     encoder = Model(inputs, [bottleneck_mu, bottleneck_sigma, sampler], name = 'encoder')
 
-    #print('ENCODE SHAPE:', encoder.get_layer('encode_pool').output_shape)
-
-    '''Need: 'bottleneck_size' and 'reshape_size' '''
+    # Set up the decoder:
     bottleneck_inputs = tf.keras.layers.Input(shape=(args['bottleneck_size'],), name = 'decode_input')
     x = tf.keras.layers.Dense(np.prod(encoder.get_layer('encode_pool').output_shape[1:]), activation = 'relu')(bottleneck_inputs)
     x = tf.keras.layers.Reshape(encoder.get_layer('encode_pool').output_shape[1:])(x)
@@ -285,10 +283,10 @@ def run_vae(label, args, save = False):
     '''
 
     # Load data:
-    Xtrain, train_labels, Xval, val_labels = load_data()
+    Xtrain, train_labels, Xval, val_labels = project3.load_data()
 
-    Ytrain, train_map = to_numeric(train_labels[label])
-    Yval, val_map = to_numeric(val_labels[label])
+    Ytrain, train_map = project3.to_numeric(train_labels[label])
+    Yval, val_map = project3.to_numeric(val_labels[label])
 
     vae, encoder, decoder = build_model(args)
 
