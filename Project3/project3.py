@@ -298,6 +298,7 @@ def evoke_task(task_number = 'task1', label = 'gender'):
         'epochs':10  
         }
         vae.run_vae('gender', args, save = False)
+        return 0
 
     train_model(model, args, label)
 
@@ -399,14 +400,25 @@ if __name__ == '__main__':
     options = set(['task' + str(i) for i in range(1, 6)])
     label_options = set(['gender', 'age'])
 
-    # Command line interface:
-    if (str(sys.argv[1]) not in options):
-        print('usage: python3 project3.py task<1-5> <gender or task>')
-        exit()
-    
-    elif (str(sys.argv[2]) not in label_options) and str(sys.argv[1] != 'task5'):
-        print('usage: python3 project3.py task<1-5> <gender or task>')
+    if len(sys.argv) < 2:
+        print('usage: python3 project3.py task<1-5> <gender or age>')
         exit()
 
+    # Command line interface:
+    if (str(sys.argv[1]) not in options):
+        print('usage: python3 project3.py task<1-5> <gender or age>')
+        exit()
+    
+    if (str(sys.argv[1]) != 'task5'):
+        if len(sys.argv) < 3:
+            print('usage: python3 project3.py task<1-5> <gender or age>')
+            exit()
+
+        elif (str(sys.argv[2]) not in label_options):
+            print('usage: python3 project3.py task<1-5> <gender or age>')
+            exit()
+        next_arg = sys.argv[2]
     else:
-        evoke_task(sys.argv[1], sys.argv[2])   
+        next_arg = None
+
+    evoke_task(sys.argv[1], next_arg)   
