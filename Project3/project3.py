@@ -195,7 +195,7 @@ def train_model(model, args, label = 'gender'):
     plot_cm(model, Xval, Yval, val_map, title = 'Task {}, {} Validation Confusion Matrix'.format(args['task_number'], label))
 
 def evoke_task(task_number = 'task1', label = 'gender'):
-    """Evokes the given task number from the command line
+    '''Evokes the given task number from the command line
         - Parsing done in if main statement
     Arguments:
     ----------
