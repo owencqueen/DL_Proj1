@@ -1,4 +1,4 @@
-import os, random
+import os, random, sys
 import numpy as np
 import pandas as pd
 import tensorflow as tf # Getting Tensorflow
@@ -15,6 +15,9 @@ import matplotlib.pyplot as plt
 
 # Using Python Image Library (PIL) for image processing
 from PIL import Image
+
+# Import other module for task5
+import vae
 
 def load_data():
     '''
@@ -57,18 +60,6 @@ def load_data():
 
     val = (val - val_min) / (val_max - val_min)
 
-    '''
-    fig, axs = plt.subplots(1, 4)
-    for i in range(4):
-        axs[i].imshow(train[random.sample(range(len(train)), 1)].reshape((32, 32)))
-
-    #plt.imshow(train[0].reshape((32, 32)))
-    plt.show()
-    '''
-
-    #print('Train labels', train_labels['gender'])
-    #print('val labels', val_labels['gender'])
-
     return np.array(train), train_labels, np.array(val), val_labels
 
 def to_numeric(pd_series):
@@ -92,9 +83,8 @@ def to_numeric(pd_series):
 
     numeric_labels = le.fit_transform(pd_series)
 
+    # Creates a mapping from numeric labels to their original, string label
     mapping = {num:label for num, label in enumerate(le.classes_)}
-
-    #print(numeric_labels)
 
     return numeric_labels, mapping
 
@@ -106,9 +96,18 @@ def plot_cm(model, Xval, Yval, val_map, title):
     ----------
     model: keras.Model() object
         - Model that we're evaluating
+    Xval: ndarray
+        - Validation data
+    Yval: ndarray
+        - Validation data
+    val_map: dictionary
+        - Map of numeric labels to original labels (to show on plot) 
+    title: string
+        - Title of given plot
 
     Returns:
     --------
+    No return value
     '''
     preds = model.predict(Xval)
 
@@ -151,7 +150,6 @@ def train_model(model, args, label = 'gender'):
     Returns:
     --------
     No return value
-
     '''
 
     Xtrain, train_labels, Xval, val_labels = load_data()
@@ -199,9 +197,17 @@ def evoke_task(task_number = 'task1', label = 'gender'):
     
     Arguments:
     ----------
+    task_number: string, optional
+        - Default: 'task1'
+        - 'task1', 'task2', or 'task3'
+        - Can be the direct input from command line (based on cmd line specs)
+    label: string, optional
+        - Default: 'gender'
+        - 'gender', 'race', or 'age'
 
     Returns:
     --------
+
     '''
 
     if task_number == 'task1':
@@ -282,6 +288,17 @@ def evoke_task(task_number = 'task1', label = 'gender'):
             'batch_size': 128,
             'task_number': 3
         }
+
+    if task_number == 'task5':
+        args = {
+        'input_shape':(32, 32, 1), 
+        'bottleneck_size':15, 
+        'reshape_size':(16, 16, 32), 
+        'batch_size': 128,
+        'epochs':10  
+        }
+        vae.run_vae('gender', args, save = False)
+        return 0
 
     train_model(model, args, label)
 
@@ -380,6 +397,28 @@ def task4(label = ['gender', 'age']):
         plot_cm(model, Xval, Yval[i], val_map[i], title = 'Task {}, Label = {} Validation Confusion Matrix'.format(4, label[i]))
 
 if __name__ == '__main__':
-    evoke_task('task2', 'age')
-    #a,b,c,d = load_data()
-    #to_numeric(d['gender'])    
+    options = set(['task' + str(i) for i in range(1, 6)])
+    label_options = set(['gender', 'age'])
+
+    if len(sys.argv) < 2:
+        print('usage: python3 project3.py task<1-5> <gender or age>')
+        exit()
+
+    # Command line interface:
+    if (str(sys.argv[1]) not in options):
+        print('usage: python3 project3.py task<1-5> <gender or age>')
+        exit()
+    
+    if (str(sys.argv[1]) != 'task5'):
+        if len(sys.argv) < 3:
+            print('usage: python3 project3.py task<1-5> <gender or age>')
+            exit()
+
+        elif (str(sys.argv[2]) not in label_options):
+            print('usage: python3 project3.py task<1-5> <gender or age>')
+            exit()
+        next_arg = sys.argv[2]
+    else:
+        next_arg = None
+
+    evoke_task(sys.argv[1], next_arg)   
