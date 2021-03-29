@@ -307,6 +307,9 @@ def evoke_task(task_number = 'task1', label = 'gender'):
             'batch_size': 128,
             'task_number': 3
         }
+    
+    if task_number == 'task4':
+        task4()
 
     if task_number == 'task5':
         args = {
@@ -408,10 +411,6 @@ def task4(label=['gender','age']):
 
     model = keras.Model(inputs=image_input, outputs=output_layers)
 
-    print(model.summary())
-
-    keras.utils.plot_model(model, "task4.png", show_shapes=True)
-
     # Using adam for all tasks
     model.compile(
         optimizer = tf.keras.optimizers.SGD(learning_rate = 0.01),#, decay=0.1/eps), 
@@ -474,7 +473,7 @@ if __name__ == '__main__':
         print('usage: python3 project3.py task<1-5> <gender or age>')
         exit()
     
-    if (str(sys.argv[1]) != 'task5'):
+    if (str(sys.argv[1]) != 'task5' and str(sys.argv[1]) != 'task4'):
         if len(sys.argv) < 3:
             print('usage: python3 project3.py task<1-5> <gender or age>')
             exit()
