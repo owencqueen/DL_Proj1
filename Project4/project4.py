@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
+import matplotlib.pyplot as plt
+
 def split_data(fname, window, stride, write = False):
     '''
     Splits the text file by window and stride size
@@ -135,8 +137,10 @@ def predict_char(initial_char, model, temp, num_char_pred, vocab_size):
     return generated_ix
 
 def train(model, X, Y, inverse_map, epochs=5):
+    histories = []
     for e in range(1, epochs):
-        model.fit(X, Y)
+        history = model.fit(X, Y)
+        histories.append(history)
         if (e % 1 == 0):
             ind = np.random.randint(0, len(X)-1)
             initial = X[ind]
@@ -148,6 +152,33 @@ def train(model, X, Y, inverse_map, epochs=5):
             txt = ''.join(inverse_map[ix] for ix in gen)
             print ('----\n {} \n----'.format (txt))
 
+    return histories
+
+def plot_loss_epoch(histories, title = ''):
+    '''
+    Plots loss vs. epoch
+
+    Arguments:
+    ----------
+    histories: list of History objects
+        - Should be return from train function
+    title: string, optional
+        - Default: '' - i.e. no title
+        - Title to show on plot
+
+    Returns:
+    --------
+    None
+    '''
+
+    train_loss = [h.history['loss'] for h in histories]
+    #val_loss = [h.history['val_loss'] for h in histories]
+
+    plt.plot(range(0, len(train_loss)), train_loss)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title(title)
+    plt.show()
 
 if __name__ == '__main__':
     #split_data('beatles.txt', 5, 3, write = False)
@@ -157,6 +188,7 @@ if __name__ == '__main__':
     model.add(layers.Dense(47, activation="softmax"))
     model.compile(loss="categorical_crossentropy", optimizer="adam")
 
-    train(model, X, Y, i_map)
+    h = train(model, X, Y, i_map)
+    plot_loss_epoch(h)
 
     
