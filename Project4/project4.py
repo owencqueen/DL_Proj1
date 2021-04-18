@@ -1,4 +1,6 @@
 import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers
 
 def split_data(fname, window, stride, write = False):
     '''
@@ -87,6 +89,8 @@ def get_train(fname):
 
     # Create map from keys to one-hot encoding
     onehot_map = {c:key for key, c in enumerate(sorted(list(set(''.join(lines)))))}
+    onehot_to_char = {key:c for key, c in enumerate(sorted(list(set(''.join(lines)))))}
+
     vsize = len(onehot_map.keys())
 
     X = []
@@ -98,6 +102,8 @@ def get_train(fname):
     # Leave out last sample (doesn't have next character for prediction)
     Xtrain = np.array(X)[:-1]
     print(Xtrain.shape)
+    #print(Xtrain)
+    #print()
 
     # Now get y labels:
     Y = []
@@ -107,10 +113,53 @@ def get_train(fname):
 
     Ytrain = np.array(Y)
     print(Ytrain.shape)
+    #print(Ytrain)
+
+    return Xtrain, Ytrain, onehot_to_char
+
+def predict_char(initial_char, model, temp, num_char_pred, vocab_size):
+    chars = initial_char
+    generated_ix = []
+    for i in range(num_char_pred):
+        preds = model.predict(np.array([chars,]))[0]
+        preds = np.log(preds)/temp
+        exp_preds = np.exp(preds)
+        preds = exp_preds / np.sum(exp_preds)
+        probas = np.random.multinomial(1, preds, 1)
+        ix = np.argmax(probas)
+        x = np.zeros((1, vocab_size))
+        x[0][ix] = 1
+        chars = np.append(chars, x, axis=0)
+        chars = chars[1:]
+        generated_ix.append(ix)
+    return generated_ix
+
+def train(model, X, Y, inverse_map, epochs=5):
+    for e in range(1, epochs):
+        model.fit(X, Y)
+        if (e % 1 == 0):
+            ind = np.random.randint(0, len(X)-1)
+            initial = X[ind]
+            initial_ind = np.argmax(initial, axis=-1)
+            txt = ''.join(inverse_map[ix] for ix in initial_ind)
+            print ('\nInitial: {}'.format (txt))
+
+            gen = predict_char(initial, model, 0.5, 100, X.shape[2])
+            txt = ''.join(inverse_map[ix] for ix in gen)
+            print ('----\n {} \n----'.format (txt))
+
 
 if __name__ == '__main__':
     #split_data('beatles.txt', 5, 3, write = False)
-    get_train('lyrics_w=5_s=3.txt')
+    X, Y, i_map = get_train('lyrics_w=5_s=3.txt')
+    model = tf.keras.models.Sequential()
+    model.add(layers.LSTM(5, input_shape=(6, 47)))
+    model.add(layers.Dense(47, activation="softmax"))
+    model.compile(loss="categorical_crossentropy", optimizer="adam")
+
+    train(model, X, Y, i_map)
+
+    
 
 
     
