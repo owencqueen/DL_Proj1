@@ -2,6 +2,8 @@ import numpy as np
 
 def split_data(fname, window, stride, write = False):
     '''
+    Splits the text file by window and stride size
+    Accomplishes Task 1
     
     Arguments:
     ----------
@@ -31,14 +33,11 @@ def split_data(fname, window, stride, write = False):
         split_lines.append(lines[i:(i + window + 1)])
         i += stride
 
-    #if not (i == len(lines)):
-    #    split_lines.append(lines[i:len(lines)])
-
-    full_txt = '\n'.join(split_lines)
 
     if write: # writes the files
         wf = open('lyrics_w={}_s={}.txt'.format(window, stride), 'w')
         # Consistent formatting prevents writing of files storing the same data
+        full_txt = '\n'.join(split_lines)
         wf.write(full_txt)
         wf.close()
 
@@ -52,9 +51,16 @@ def make_onehot(vsize, ind):
 
     Arguments:
     ----------
+    vsize: int
+        - Size of vocabulary
+        - Determines size of array in output
+    ind: int
+        - Index that will be marked 1
 
     Returns:
     --------
+    g: ndarray of size (vsize,)
+        - One-hot encoded array
     '''
     g = np.zeros(vsize)
     g[ind] = 1.0
@@ -62,12 +68,17 @@ def make_onehot(vsize, ind):
 
 def get_train(fname):
     '''
+    Gets training data from split file
+    Accomplishes Task 2
     
     Arguments:
     ----------
+    fname: string
+        - Name of file that contains the split data
 
     Returns:
     --------
+    None
     '''
 
     f = open(fname, 'r')
