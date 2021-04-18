@@ -80,7 +80,12 @@ def get_train(fname):
 
     Returns:
     --------
-    None
+    Xtrain: (m, n, p) ndarray
+        - m: number of sequences
+        - n: length of sequences
+        - p: vocabulary size
+
+    Ytrain: 
     '''
 
     f = open(fname, 'r')
@@ -101,9 +106,6 @@ def get_train(fname):
 
     # Leave out last sample (doesn't have next character for prediction)
     Xtrain = np.array(X)[:-1]
-    print(Xtrain.shape)
-    #print(Xtrain)
-    #print()
 
     # Now get y labels:
     Y = []
@@ -112,8 +114,6 @@ def get_train(fname):
         Y.append(X[i + 1][0])
 
     Ytrain = np.array(Y)
-    print(Ytrain.shape)
-    #print(Ytrain)
 
     return Xtrain, Ytrain, onehot_to_char
 
@@ -158,8 +158,5 @@ if __name__ == '__main__':
     model.compile(loss="categorical_crossentropy", optimizer="adam")
 
     train(model, X, Y, i_map)
-
-    
-
 
     
