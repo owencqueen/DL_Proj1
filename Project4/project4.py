@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
+from sklearn.model_selection import train_test_split
+
 import matplotlib.pyplot as plt
 
 def split_data(fname, window, stride, write = False):
@@ -37,7 +39,6 @@ def split_data(fname, window, stride, write = False):
         split_lines.append(lines[i:(i + window + 1)])
         i += stride
 
-
     if write: # writes the files
         wf = open('lyrics_w={}_s={}.txt'.format(window, stride), 'w')
         # Consistent formatting prevents writing of files storing the same data
@@ -48,6 +49,38 @@ def split_data(fname, window, stride, write = False):
     f.close()
 
     return split_lines
+
+def train_test(test_size, window, stride):
+    '''
+    Basically a wrapper on train_test_split to work with our system
+
+    Arguments:
+    ----------
+    test_size: float
+        - Size of testing split
+    window: int
+        - Same window parameter as split_data
+    stride: int
+        - Same stride parameter as split_data
+
+    Returns:
+    --------
+    Xtrain, Xtest, Ytrain, Ytest
+    Xtrain: ndarray
+        - X training data
+    Xtest: ndarray
+        - X validation data
+    Ytrain: ndarray
+        - Y training data
+    Ytest: ndarray
+        - Y validation data
+    '''
+
+    # Get the lines without writing file
+    lines = split_data('beatles.txt', window, stride, write = False)
+    X, Y, onehot_to_char = get_train(lines, file = False)
+
+    return train_test_split(X, Y, test_size = test_size, shuffle = True)
 
 def make_onehot(vsize, ind):
     '''
@@ -70,7 +103,7 @@ def make_onehot(vsize, ind):
     g[ind] = 1.0
     return g
 
-def get_train(fname):
+def get_train(fname, file = True):
     '''
     Gets training data from split file
     Accomplishes Task 2
@@ -90,9 +123,12 @@ def get_train(fname):
     Ytrain: 
     '''
 
-    f = open(fname, 'r')
-    lines = f.readlines()
-    lines = [l.replace('\n', '') for l in lines]
+    if file:
+        f = open(fname, 'r')
+        lines = f.readlines()
+        lines = [l.replace('\n', '') for l in lines]
+    else:
+        lines = fname
 
     # Create map from keys to one-hot encoding
     onehot_map = {c:key for key, c in enumerate(sorted(list(set(''.join(lines)))))}
