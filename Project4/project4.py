@@ -78,7 +78,12 @@ def get_train(fname):
 
     Returns:
     --------
-    None
+    Xtrain: (m, n, p) ndarray
+        - m: number of sequences
+        - n: length of sequences
+        - p: vocabulary size
+
+    Ytrain: 
     '''
 
     f = open(fname, 'r')
@@ -97,7 +102,6 @@ def get_train(fname):
 
     # Leave out last sample (doesn't have next character for prediction)
     Xtrain = np.array(X)[:-1]
-    print(Xtrain.shape)
 
     # Now get y labels:
     Y = []
@@ -106,11 +110,23 @@ def get_train(fname):
         Y.append(X[i + 1][0])
 
     Ytrain = np.array(Y)
-    print(Ytrain.shape)
+   
+    return Xtrain, Ytrain
+
+def get_chars(temp):
+    pass
+
+def train_model(model, Xtrain, Ytrain, epochs):
+    pass
 
 if __name__ == '__main__':
     #split_data('beatles.txt', 5, 3, write = False)
-    get_train('lyrics_w=5_s=3.txt')
+    x, y = get_train('lyrics_w=5_s=3.txt')
+
+    print(x[0:5])
+    print(y[0:5])
+
+    print(x.shape)
 
 
     
