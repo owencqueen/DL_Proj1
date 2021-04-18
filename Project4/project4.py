@@ -2,6 +2,10 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
+from sklearn.model_selection import train_test_split
+
+import matplotlib.pyplot as plt
+
 def split_data(fname, window, stride, write = False):
     '''
     Splits the text file by window and stride size
@@ -35,7 +39,6 @@ def split_data(fname, window, stride, write = False):
         split_lines.append(lines[i:(i + window + 1)])
         i += stride
 
-
     if write: # writes the files
         wf = open('lyrics_w={}_s={}.txt'.format(window, stride), 'w')
         # Consistent formatting prevents writing of files storing the same data
@@ -46,6 +49,38 @@ def split_data(fname, window, stride, write = False):
     f.close()
 
     return split_lines
+
+def train_test(test_size, window, stride):
+    '''
+    Basically a wrapper on train_test_split to work with our system
+
+    Arguments:
+    ----------
+    test_size: float
+        - Size of testing split
+    window: int
+        - Same window parameter as split_data
+    stride: int
+        - Same stride parameter as split_data
+
+    Returns:
+    --------
+    Xtrain, Xtest, Ytrain, Ytest
+    Xtrain: ndarray
+        - X training data
+    Xtest: ndarray
+        - X validation data
+    Ytrain: ndarray
+        - Y training data
+    Ytest: ndarray
+        - Y validation data
+    '''
+
+    # Get the lines without writing file
+    lines = split_data('beatles.txt', window, stride, write = False)
+    X, Y, onehot_to_char = get_train(lines, file = False)
+
+    return train_test_split(X, Y, test_size = test_size, shuffle = True)
 
 def make_onehot(vsize, ind):
     '''
@@ -68,7 +103,7 @@ def make_onehot(vsize, ind):
     g[ind] = 1.0
     return g
 
-def get_train(fname):
+def get_train(fname, file = True):
     '''
     Gets training data from split file
     Accomplishes Task 2
@@ -88,9 +123,12 @@ def get_train(fname):
     Ytrain: 
     '''
 
-    f = open(fname, 'r')
-    lines = f.readlines()
-    lines = [l.replace('\n', '') for l in lines]
+    if file:
+        f = open(fname, 'r')
+        lines = f.readlines()
+        lines = [l.replace('\n', '') for l in lines]
+    else:
+        lines = fname
 
     # Create map from keys to one-hot encoding
     onehot_map = {c:key for key, c in enumerate(sorted(list(set(''.join(lines)))))}
@@ -135,8 +173,10 @@ def predict_char(initial_char, model, temp, num_char_pred, vocab_size):
     return generated_ix
 
 def train(model, X, Y, inverse_map, epochs=5):
+    histories = []
     for e in range(1, epochs):
-        model.fit(X, Y)
+        history = model.fit(X, Y)
+        histories.append(history)
         if (e % 1 == 0):
             ind = np.random.randint(0, len(X)-1)
             initial = X[ind]
@@ -148,6 +188,33 @@ def train(model, X, Y, inverse_map, epochs=5):
             txt = ''.join(inverse_map[ix] for ix in gen)
             print ('----\n {} \n----'.format (txt))
 
+    return histories
+
+def plot_loss_epoch(histories, title = ''):
+    '''
+    Plots loss vs. epoch
+
+    Arguments:
+    ----------
+    histories: list of History objects
+        - Should be return from train function
+    title: string, optional
+        - Default: '' - i.e. no title
+        - Title to show on plot
+
+    Returns:
+    --------
+    None
+    '''
+
+    train_loss = [h.history['loss'] for h in histories]
+    #val_loss = [h.history['val_loss'] for h in histories]
+
+    plt.plot(range(0, len(train_loss)), train_loss)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title(title)
+    plt.show()
 
 if __name__ == '__main__':
     #split_data('beatles.txt', 5, 3, write = False)
@@ -157,6 +224,7 @@ if __name__ == '__main__':
     model.add(layers.Dense(47, activation="softmax"))
     model.compile(loss="categorical_crossentropy", optimizer="adam")
 
-    train(model, X, Y, i_map)
+    h = train(model, X, Y, i_map)
+    plot_loss_epoch(h)
 
     
