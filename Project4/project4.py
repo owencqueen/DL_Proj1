@@ -1,8 +1,12 @@
+# Owen Queen and Sai Thatigotla: Project 4, COSC 525
+
+import sys
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-
-from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import LSTM, SimpleRNN
 
 import matplotlib.pyplot as plt
 
@@ -21,7 +25,6 @@ def split_data(fname, window, stride, write = False):
         - Stride by which to increment on each window
     write: bool, optional
         - If True, writes the training data to file
-
     Returns:
     --------
     split_lines: list of strings
@@ -48,44 +51,11 @@ def split_data(fname, window, stride, write = False):
 
     f.close()
 
-    return split_lines
-
-def train_test(test_size, window, stride):
-    '''
-    Basically a wrapper on train_test_split to work with our system
-
-    Arguments:
-    ----------
-    test_size: float
-        - Size of testing split
-    window: int
-        - Same window parameter as split_data
-    stride: int
-        - Same stride parameter as split_data
-
-    Returns:
-    --------
-    Xtrain, Xtest, Ytrain, Ytest
-    Xtrain: ndarray
-        - X training data
-    Xtest: ndarray
-        - X validation data
-    Ytrain: ndarray
-        - Y training data
-    Ytest: ndarray
-        - Y validation data
-    '''
-
-    # Get the lines without writing file
-    lines = split_data('beatles.txt', window, stride, write = False)
-    X, Y, onehot_to_char = get_train(lines, file = False)
-
-    return train_test_split(X, Y, test_size = test_size, shuffle = True)
+    return split_lines, lines
 
 def make_onehot(vsize, ind):
     '''
     Makes a one-hot encoding for a character
-
     Arguments:
     ----------
     vsize: int
@@ -93,7 +63,6 @@ def make_onehot(vsize, ind):
         - Determines size of array in output
     ind: int
         - Index that will be marked 1
-
     Returns:
     --------
     g: ndarray of size (vsize,)
@@ -112,15 +81,19 @@ def get_train(fname, file = True):
     ----------
     fname: string
         - Name of file that contains the split data
-
     Returns:
     --------
     Xtrain: (m, n, p) ndarray
         - m: number of sequences
         - n: length of sequences
         - p: vocabulary size
-
-    Ytrain: 
+    Ytrain: (m, p) ndarray
+        - m: number of sequences
+        - p: vocabulary size
+    onehot_map: dict
+        - Mapping from char to one-hot encoding index
+    onehot_to_char: dict
+        - Mapping from one-hot encoding index to char
     '''
 
     if file:
@@ -137,56 +110,130 @@ def get_train(fname, file = True):
     vsize = len(onehot_map.keys())
 
     X = []
+    Y = []
     for l in lines:
         X.append([])
-        for c in l:
+        Y.append(make_onehot(vsize, onehot_map[l[-1]]))
+        for c in l[:-1]:
             X[-1].append(make_onehot(vsize, onehot_map[c]))
 
     # Leave out last sample (doesn't have next character for prediction)
-    Xtrain = np.array(X)[:-1]
-
-    # Now get y labels:
-    Y = []
-    for i in range(len(X) - 1):
-        # First character of i + 1 sequence
-        Y.append(X[i + 1][0])
-
+    Xtrain = np.array(X)
     Ytrain = np.array(Y)
 
-    return Xtrain, Ytrain, onehot_to_char
+    return Xtrain, Ytrain, onehot_map, onehot_to_char
 
-def predict_char(initial_char, model, temp, num_char_pred, vocab_size):
+def predict_char(initial_char, model, temp, num_char_pred, vocab_size, window_size, orig_map, inverse_map):
+    '''
+    Arguments:
+    ----------
+    intial_char: ndarray
+        - Initial string
+    model: keras Model object
+        - Trained model which we use to make predictions
+    temp: float
+        - Sampling temperature
+    num_char_pred: int
+        - Number of characters that we wish to predict
+    vocab_size: int
+        - Size of vocabulary for entire training/prediction problem
+    window_size: int
+        - Size of window used in preprocessing
+    orig_map: dict
+        - Mapping from character to index for one-hot encoding
+    inverse_map: dict
+        - Reverse mapping of orig_map
+
+    Returns:
+    --------
+    generated_chars: string
+        - Generated characters predicted by the model
+    '''
     chars = initial_char
-    generated_ix = []
+    
+    generated_chars = ""
+    
     for i in range(num_char_pred):
-        preds = model.predict(np.array([chars,]))[0]
+        input_chars = np.zeros((1, window_size, vocab_size))
+        
+        for j,k in enumerate(chars):
+          input_chars[0, j, orig_map[k]] = 1.0
+
+        preds = model.predict(np.array(input_chars))
+        preds = preds[0]
+        preds = np.asarray(preds).astype('float64')
+
+        # Temp/Softmax on predictions:
         preds = np.log(preds)/temp
         exp_preds = np.exp(preds)
         preds = exp_preds / np.sum(exp_preds)
+
+        # Sampling based on predictions:
         probas = np.random.multinomial(1, preds, 1)
+
         ix = np.argmax(probas)
-        x = np.zeros((1, vocab_size))
-        x[0][ix] = 1
-        chars = np.append(chars, x, axis=0)
+        next_char = inverse_map[ix]
+        
+        # Increment strings:
+        chars += next_char
+        generated_chars += next_char
+
         chars = chars[1:]
-        generated_ix.append(ix)
-    return generated_ix
+        
+    return generated_chars
 
-def train(model, X, Y, inverse_map, epochs=5):
+def train(model, X, Y, orig_map, inverse_map, lines, epochs=100, temp=[0.01, 0.25, 0.5, 0.75, 1.0]):
+    '''
+    Arguments:
+    ----------
+    model: keras Model object
+        - model object holding architecture to be trained
+    X: nd array
+        - Training data in the form of a tensor
+    Y: nd array
+        - 
+    orig_map: dict
+        - Mapping from character to index for one-hot encoding
+    inverse_map: dict
+        - Reverse mapping of orig_map
+    lines: list of strings
+        - Separated strings that represent the training file broken into window, stride
+    epochs: int
+        - Number of epochs to train model
+    temp: list of floats OR int, optional
+        - Default: [0.01, 0.25, 0.5, 0.75, 1.0]
+        - Sampling temperatures to use for a qualitative evaluation of the model at every fourth epoch
+
+    Returns:
+    --------
+    histories: list of History objects
+        - Histories from each epoch that the model is ran
+    '''
+
     histories = []
-    for e in range(1, epochs):
-        history = model.fit(X, Y)
+    for e in range(1, epochs+1):
+        history = model.fit(X, Y, batch_size=64)
         histories.append(history)
-        if (e % 1 == 0):
-            ind = np.random.randint(0, len(X)-1)
-            initial = X[ind]
-            initial_ind = np.argmax(initial, axis=-1)
-            txt = ''.join(inverse_map[ix] for ix in initial_ind)
-            print ('\nInitial: {}'.format (txt))
 
-            gen = predict_char(initial, model, 0.5, 100, X.shape[2])
-            txt = ''.join(inverse_map[ix] for ix in gen)
-            print ('----\n {} \n----'.format (txt))
+        # Evaluate every 4th epoch:
+        if ((e % 4 == 0) or (e == epochs)):
+            
+            ind = np.random.randint(0, len(lines) - X.shape[1] - 1)
+            
+            initial = lines[ind: ind+X.shape[1]]
+
+            print('Initial: {}\n'.format(initial))
+
+            # Qualitative evaulation on predictions based on random sequence
+            if (isinstance(temp, list)):
+                for j in temp:
+                    gen = predict_char(initial, model, j, 100, X.shape[2], X.shape[1], orig_map, inverse_map)
+                    print ('----\nTemperature: {}\n{} \n----'.format (j, gen))
+
+            else:
+                gen = predict_char(initial, model, temp, 100, X.shape[2], X.shape[1], orig_map, inverse_map)
+                txt = ''.join(inverse_map[ix] for ix in gen)
+                print ('----\nTemperature: {}\n{} \n----'.format (temp, txt))
 
     return histories
 
@@ -208,7 +255,6 @@ def plot_loss_epoch(histories, title = ''):
     '''
 
     train_loss = [h.history['loss'] for h in histories]
-    #val_loss = [h.history['val_loss'] for h in histories]
 
     plt.plot(range(0, len(train_loss)), train_loss)
     plt.xlabel('Epoch')
@@ -216,15 +262,44 @@ def plot_loss_epoch(histories, title = ''):
     plt.title(title)
     plt.show()
 
-if __name__ == '__main__':
-    #split_data('beatles.txt', 5, 3, write = False)
-    X, Y, i_map = get_train('lyrics_w=5_s=3.txt')
-    model = tf.keras.models.Sequential()
-    model.add(layers.LSTM(5, input_shape=(6, 47)))
-    model.add(layers.Dense(47, activation="softmax"))
-    model.compile(loss="categorical_crossentropy", optimizer="adam")
+if __name__ == '__main__': 
+    # Command line interface for the project
 
-    h = train(model, X, Y, i_map)
-    plot_loss_epoch(h)
-
+    model_opts = {'lstm', 'rnn'}
     
+    # Error checking
+    if len(sys.argv) != 7:
+        print('usage: python3 project4.py <file> <lstm or rnn> <hidden state size> <window size> <stride> <temperature>')
+        exit()
+    
+    if not (sys.argv[2] in model_opts):
+        print('usage: python3 project4.py <file> <lstm or rnn> <hidden state size> <window size> <stride> <temperature>')
+        exit()
+    
+    # Setting up arguments
+    hstate = int(sys.argv[3])
+    window = int(sys.argv[4])
+    stride = int(sys.argv[5])
+    temp = float(sys.argv[6])
+
+    splits, lines = split_data(sys.argv[1], window, stride, write = False)
+    X, Y, orig_map, i_map = get_train(splits, file = False)
+
+    vocab_size = len(list(orig_map.keys()))
+
+    # Builds the given model architectures
+    model = tf.keras.models.Sequential()
+    if sys.argv[2] == 'lstm':
+        model.add(layers.LSTM(hstate, input_shape = (window, vocab_size)))
+
+    elif sys.argv[2] == 'rnn':
+        model.add(layers.SimpleRNN(hstate, input_shape = (window, vocab_size)))
+
+    model.add(layers.Dense(vocab_size, activation = 'softmax'))
+
+    # Compiles the model
+    model.compile(loss='categorical_crossentropy', optimizer = 'adam')
+
+    # Train the model and show the loss plot
+    h = train(model, X, Y, orig_map, i_map, lines, epochs = 15)
+    plot_loss_epoch(h, title = sys.argv[2].upper() + ' w = {}, stride = {}, hidden units = {} Loss'.format(window, stride, hstate))
